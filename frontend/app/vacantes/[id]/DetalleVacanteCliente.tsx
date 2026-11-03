@@ -6,7 +6,12 @@ import { ArrowLeft, Bookmark, BriefcaseBusiness, CircleAlert, FileText, Info, Ma
 import { useEffect, useState, type ReactNode } from 'react';
 import { boardStyles as styles } from '../components/jobs-styles';
 import { useVacancyConsultationSession } from '../components/VacancyConsultationProvider';
-import { isVacancyAvailable, VacancyApiError } from '../../../lib/api/vacantes';
+import {
+  getTechnicalVacancyRequirements,
+  isVacancyAvailable,
+  VacancyApiError,
+  type TechnicalVacancyRequirement,
+} from '../../../lib/api/vacantes';
 import { loadHu8Vacancy } from '../../../lib/vacancies/consultation-source';
 import { hu8Href, resolveHu8DemoScenario, type Hu8DemoScenario } from '../../../lib/vacancies/demo-mode';
 import type { Hu8VacancyDetail } from '../../../lib/vacancies/detail-content';
@@ -52,7 +57,13 @@ function DetailLoading() {
   );
 }
 
-function VacancyContent({ vacancy }: { vacancy: Hu8VacancyDetail }) {
+function VacancyContent({
+  vacancy,
+  technicalRequirements,
+}: {
+  vacancy: Hu8VacancyDetail;
+  technicalRequirements: TechnicalVacancyRequirement[] | null;
+}) {
   const content = vacancy.detailContent;
   const requirements = uniqueVacancyRequirements(vacancy.requisitos);
   const available = isVacancyAvailable(vacancy.estado);
@@ -97,9 +108,32 @@ function VacancyContent({ vacancy }: { vacancy: Hu8VacancyDetail }) {
 
           <section className="hu8-detail-card" aria-labelledby="technical-requirements-heading">
             <h2 id="technical-requirements-heading"><FileText size={18} aria-hidden="true" />Competencias requeridas</h2>
-            {requirements.length > 0 ? <ul className="hu8-detail-bullets hu8-detail-requirements">
-              {requirements.map((requirement) => <li key={requirement.id}>{requirement.nombre}</li>)}
-            </ul> : <p>{NO_TECHNICAL_REQUIREMENTS}</p>}
+            {technicalRequirements !== null ? (
+  technicalRequirements.length > 0 ? (
+    <ul className="hu8-detail-bullets hu8-detail-requirements">
+      {technicalRequirements.map((requirement) => (
+        <li key={requirement.id}>
+          <strong>{requirement.competencia}</strong>
+          <span> — Nivel: {requirement.nivel}</span>
+          <span> — Tipo: {requirement.tipo}</span>
+          {requirement.descripcion && (
+            <p>{requirement.descripcion}</p>
+          )}
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p>{NO_TECHNICAL_REQUIREMENTS}</p>
+  )
+) : requirements.length > 0 ? (
+  <ul className="hu8-detail-bullets hu8-detail-requirements">
+    {requirements.map((requirement) => (
+      <li key={requirement.id}>{requirement.nombre}</li>
+    ))}
+  </ul>
+) : (
+  <p>{NO_TECHNICAL_REQUIREMENTS}</p>
+)}
             {content?.desirable && <div className="hu8-detail-desirable">
               <h3>Competencia deseable</h3>
               <p>{content.desirable}</p>
@@ -144,16 +178,26 @@ function VacancyContent({ vacancy }: { vacancy: Hu8VacancyDetail }) {
 function DetalleVacanteContenido({ id, scenario, onRetry }: Props & { scenario: Hu8DemoScenario | null; onRetry: () => void }) {
   const session = useVacancyConsultationSession(scenario);
   const [vacancy, setVacancy] = useState<Hu8VacancyDetail | null>(null);
+  const [technicalRequirements, setTechnicalRequirements] =
+  useState<TechnicalVacancyRequirement[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    loadHu8Vacancy(id, scenario, controller.signal, session.journey)
-      .then((result) => {
-        if (!controller.signal.aborted) setVacancy(result);
-      })
+Promise.all([
+  loadHu8Vacancy(id, scenario, controller.signal, session.journey),
+  scenario
+    ? Promise.resolve(null)
+    : getTechnicalVacancyRequirements(id, controller.signal),
+])
+  .then(([result, requisitos]) => {
+    if (!controller.signal.aborted) {
+      setVacancy(result);
+      setTechnicalRequirements(requisitos);
+    }
+  })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) return;
         setVacancy(null);
@@ -184,7 +228,12 @@ function DetalleVacanteContenido({ id, scenario, onRetry }: Props & { scenario: 
               <Link href={hu8Href('/vacantes', scenario)} className={styles.button}>Volver a vacantes</Link>
             </div>
           </section>
-        ) : <VacancyContent vacancy={vacancy} />}
+          ) : (
+        <VacancyContent
+    vacancy={vacancy}
+    technicalRequirements={technicalRequirements}
+  />
+)}
       </div>
       <footer className="hu8-detail-footer"><div><span>UMSSPIRA · Universidad Mayor de San Simón</span><span>Ayuda y soporte</span></div></footer>
     </main>

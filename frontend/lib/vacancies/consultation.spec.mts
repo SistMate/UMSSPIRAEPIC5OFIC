@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
-import { getVacancy, searchIndexedVacancies, VacancyApiError } from '../api/vacantes.ts';
+import {
+  getVacancy,
+  getTechnicalVacancyRequirements,
+  searchIndexedVacancies,
+  VacancyApiError,
+} from '../api/vacantes.ts';
 import { NO_TECHNICAL_REQUIREMENTS, uniqueVacancyRequirements } from './requirements.ts';
 import { vacancyA, vacancyB, vacancyWithoutRequirements } from '../../tests/fixtures/hu8.ts';
 
@@ -119,5 +124,35 @@ describe('Consulta de requisitos técnicos (HU8)', () => {
     mock.restoreAll();
     mock.method(globalThis, 'fetch', async () => Response.json({ vacantes: [vacancyA] }));
     await assert.rejects(searchIndexedVacancies(''), /No se pudo verificar el listado/);
+  });
+});
+describe('Consulta de requisitos estructurados de HU2 para HU8', () => {
+  it('consulta los requisitos técnicos de la vacante seleccionada', async () => {
+    const idVacante = 'vacante-123';
+
+    const requisitosEsperados = [
+      {
+        id: 'requisito-1',
+        idVacante,
+        competencia: 'SQL',
+        nivel: 'Avanzado',
+        tipo: 'Obligatorio',
+        descripcion: 'Consultas y bases de datos',
+        fechaCreacion: '2026-01-15T10:00:00.000Z',
+      },
+    ];
+
+    const fetchSimulado = mock.method(globalThis, 'fetch', async () => {
+      return Response.json(requisitosEsperados);
+    });
+
+    const resultado = await getTechnicalVacancyRequirements(idVacante);
+
+    assert.deepEqual(resultado, requisitosEsperados);
+    assert.equal(fetchSimulado.mock.callCount(), 1);
+    assert.match(
+      String(fetchSimulado.mock.calls[0].arguments[0]),
+      /\/vacantes\/vacante-123\/requisitos$/,
+    );
   });
 });

@@ -163,3 +163,53 @@ export function getVacancyIdentifier(vacancy: Pick<Vacancy, 'id'>) {
   // HU1/HU2 sustituirán este adaptador cuando exista un código oficial.
   return vacancy.id;
 }
+export type TechnicalVacancyRequirement = {
+  id: string;
+  idVacante: string;
+  competencia: string;
+  nivel: 'Básico' | 'Intermedio' | 'Avanzado' | 'Experto';
+  tipo: 'Obligatorio' | 'Deseable';
+  descripcion?: string;
+  fechaCreacion: string;
+};
+
+export async function getTechnicalVacancyRequirements(
+  idVacante: string,
+  signal?: AbortSignal,
+): Promise<TechnicalVacancyRequirement[]> {
+  const requisitos = await request<unknown>(
+    `/vacantes/${encodeURIComponent(idVacante)}/requisitos`,
+    { signal },
+  );
+
+  const niveles = ['Básico', 'Intermedio', 'Avanzado', 'Experto'];
+  const tipos = ['Obligatorio', 'Deseable'];
+
+  if (
+    !Array.isArray(requisitos) ||
+    !requisitos.every((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return false;
+
+      const requisito = item as Record<string, unknown>;
+
+      return (
+        typeof requisito.id === 'string' &&
+        typeof requisito.idVacante === 'string' &&
+        requisito.idVacante.toLowerCase() === idVacante.toLowerCase() &&
+        typeof requisito.competencia === 'string' &&
+        requisito.competencia.trim().length > 0 &&
+        niveles.includes(String(requisito.nivel)) &&
+        tipos.includes(String(requisito.tipo)) &&
+        (requisito.descripcion === undefined ||
+          typeof requisito.descripcion === 'string') &&
+        typeof requisito.fechaCreacion === 'string'
+      );
+    })
+  ) {
+    throw new VacancyApiError(
+      'No se pudieron verificar los requisitos técnicos de esta vacante.',
+    );
+  }
+
+  return requisitos as TechnicalVacancyRequirement[];
+}
