@@ -4,8 +4,11 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BriefcaseBusiness, Save } from 'lucide-react';
-
-const STORAGE_KEY = 'umsspira-vacantes';
+import {
+  parseSavedVacancies,
+  VACANCIES_STORAGE_KEY,
+  type Vacancy,
+} from '../vacancy-data';
 
 const AREAS = [
 'Desarrollo de Software',
@@ -15,19 +18,6 @@ const AREAS = [
 'Gestión de Proyectos',
 'Otra área',
 ];
-
-type Vacancy = {
-id: string;
-title: string;
-company: string;
-area: string;
-location: string;
-modality: string;
-description: string;
-requirements: string[];
-conditions: string;
-createdAt: string;
-};
 
 export default function NuevaVacantePage() {
 const router = useRouter();
@@ -90,15 +80,12 @@ const vacancy: Vacancy = {
 };
 
 try {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  const vacancies: Vacancy[] = saved ? JSON.parse(saved) : [];
-
-  if (!Array.isArray(vacancies)) {
-    throw new Error('Los datos guardados no tienen el formato esperado.');
-  }
+  const vacancies = parseSavedVacancies(
+    localStorage.getItem(VACANCIES_STORAGE_KEY),
+  );
 
   localStorage.setItem(
-    STORAGE_KEY,
+    VACANCIES_STORAGE_KEY,
     JSON.stringify([...vacancies, vacancy]),
   );
 

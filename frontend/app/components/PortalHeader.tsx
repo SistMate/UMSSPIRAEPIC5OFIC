@@ -2,11 +2,13 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navigation = [
   { label: 'Inicio', href: '/' },
+  { label: 'Ofertas de trabajo', href: '/ofertas-trabajo' },
   { label: 'Vacantes', href: '/vacantes' },
   { label: 'Mis postulaciones', href: '/postulaciones' },
   { label: 'Perfil', href: '/perfil/experiencia-laboral' },
@@ -44,7 +46,13 @@ function NavigationLinks({ pathname }: { pathname?: string | null }) {
 
 function ActiveNavigationLinks() {
   const pathname = usePathname();
-  return <NavigationLinks pathname={pathname} />;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return <NavigationLinks pathname={mounted ? pathname : null} />;
 }
 
 export default function PortalHeader() {

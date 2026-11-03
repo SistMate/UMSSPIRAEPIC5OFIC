@@ -11,6 +11,8 @@ export type Vacancy = {
   requirements: string[];
   conditions?: string;
   createdAt?: string;
+  affinityPercentage?: number | null;
+  available?: boolean;
 };
 
 export const DEMO_VACANCIES: Vacancy[] = [
@@ -24,6 +26,7 @@ export const DEMO_VACANCIES: Vacancy[] = [
     description:
       'Buscamos una persona interesada en analizar información, elaborar reportes y apoyar la toma de decisiones mediante el uso de datos.',
     requirements: ['SQL básico', 'Excel', 'Pensamiento analítico'],
+    affinityPercentage: 88,
     conditions:
       'Jornada completa. Oportunidad de aprendizaje y crecimiento profesional.',
   },
@@ -37,6 +40,7 @@ export const DEMO_VACANCIES: Vacancy[] = [
     description:
       'Participarás en el desarrollo de interfaces web, trabajando junto al equipo de diseño y desarrollo para construir experiencias de usuario.',
     requirements: ['JavaScript', 'React', 'Git'],
+    affinityPercentage: 86,
     conditions: 'Trabajo remoto y colaboración con un equipo de desarrollo.',
   },
   {
@@ -49,6 +53,7 @@ export const DEMO_VACANCIES: Vacancy[] = [
     description:
       'Apoyarás en la atención de incidentes técnicos, mantenimiento de equipos y asistencia a usuarios.',
     requirements: ['Windows', 'Redes básicas', 'Atención al usuario'],
+    affinityPercentage: 0,
     conditions: 'Trabajo presencial. Capacitación inicial incluida.',
   },
 ];
@@ -70,7 +75,14 @@ function isVacancy(value: unknown): value is Vacancy {
     (vacancy.conditions === undefined ||
       typeof vacancy.conditions === 'string') &&
     (vacancy.createdAt === undefined ||
-      typeof vacancy.createdAt === 'string')
+      typeof vacancy.createdAt === 'string') &&
+    (vacancy.affinityPercentage === undefined ||
+      vacancy.affinityPercentage === null ||
+      (typeof vacancy.affinityPercentage === 'number' &&
+        Number.isFinite(vacancy.affinityPercentage) &&
+        vacancy.affinityPercentage >= 0 &&
+        vacancy.affinityPercentage <= 100)) &&
+    (vacancy.available === undefined || typeof vacancy.available === 'boolean')
   );
 }
 

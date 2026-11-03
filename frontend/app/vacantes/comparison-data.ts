@@ -106,3 +106,16 @@ export function compareRequirements(
     };
   });
 }
+
+export function calculateAffinityPercentage(
+  vacancy: Vacancy,
+  skills: Skill[],
+): number | null {
+  if (vacancy.requirements.length === 0 || skills.length === 0) return null;
+
+  const matchedRequirements = compareRequirements(vacancy, skills).filter(
+    (requirement) => requirement.meetsRequirement,
+  ).length;
+
+  return Math.round((matchedRequirements / vacancy.requirements.length) * 100);
+}
