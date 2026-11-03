@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -9,8 +10,9 @@ import {
 } from 'class-validator';
 
 export class CreateVacanteDto {
+  @IsOptional()
   @IsUUID()
-  idEmpresa!: string;
+  idEmpresa?: string;
 
   @IsString()
   @MinLength(2)

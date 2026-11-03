@@ -4,19 +4,13 @@ import type {
   RequisitoTecnico,
   TipoRequisito,
 } from './contracts';
-
-const DEFAULT_API_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://backend-umsspira.vercel.app'
-    : 'http://localhost:3000';
-
-const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL;
+import { apiUrl } from '../../shared/services/api-contract';
+import { authenticatedFetch } from '../../shared/services/auth-session';
 
 export class TechnicalRequirementsClient {
   private readonly baseUrl: string;
 
-  constructor(baseUrl: string = BACKEND_BASE_URL) {
+  constructor(baseUrl = '') {
     this.baseUrl = baseUrl;
   }
 
@@ -26,7 +20,8 @@ export class TechnicalRequirementsClient {
   ): Promise<T> {
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
+      const url = this.baseUrl ? `${this.baseUrl}${path}` : apiUrl(path);
+      response = await authenticatedFetch(url, {
         ...init,
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +77,7 @@ export class TechnicalRequirementsClient {
     idVacante: string,
   ): Promise<RequisitoTecnico[]> {
     const requirements = await this.requestRemote<unknown>(
-      `/vacantes/${encodeURIComponent(idVacante)}/requisitos`,
+      `/api/v1/vacantes/${encodeURIComponent(idVacante)}/requisitos`,
     );
     if (
       !Array.isArray(requirements) ||
@@ -99,7 +94,7 @@ export class TechnicalRequirementsClient {
     idVacante: string,
   ): Promise<EstructuraIndexacionVacante> {
     const structure = await this.requestRemote<unknown>(
-      `/vacantes/${encodeURIComponent(idVacante)}/requisitos/matching`,
+      `/api/v1/vacantes/${encodeURIComponent(idVacante)}/requisitos/matching`,
     );
     if (!isMatchingStructure(structure)) {
       throw new Error(
@@ -131,7 +126,7 @@ export class TechnicalRequirementsClient {
     },
   ): Promise<RequisitoTecnico> {
     const requirement = await this.requestRemote<unknown>(
-      `/vacantes/${encodeURIComponent(idVacante)}/requisitos/${encodeURIComponent(idRequisito)}`,
+      `/api/v1/vacantes/${encodeURIComponent(idVacante)}/requisitos/${encodeURIComponent(idRequisito)}`,
       {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -150,7 +145,7 @@ export class TechnicalRequirementsClient {
     requisitos: Omit<RequisitoTecnico, 'id' | 'idVacante' | 'fechaCreacion'>[],
   ): Promise<RequisitoTecnico[]> {
     const requirements = await this.requestRemote<unknown>(
-      `/vacantes/${encodeURIComponent(idVacante)}/requisitos`,
+      `/api/v1/vacantes/${encodeURIComponent(idVacante)}/requisitos`,
       {
         method: 'POST',
         body: JSON.stringify({ requisitos }),
@@ -179,7 +174,7 @@ export class TechnicalRequirementsClient {
     idRequisito: string,
   ): Promise<void> {
     await this.requestRemote<{ eliminado: true; id: string }>(
-      `/vacantes/${encodeURIComponent(idVacante)}/requisitos/${encodeURIComponent(idRequisito)}`,
+      `/api/v1/vacantes/${encodeURIComponent(idVacante)}/requisitos/${encodeURIComponent(idRequisito)}`,
       { method: 'DELETE' },
     );
   }

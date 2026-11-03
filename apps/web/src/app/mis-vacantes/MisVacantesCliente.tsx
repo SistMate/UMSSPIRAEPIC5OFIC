@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  configuredCompanyId,
   isVacancyAvailable,
   listVacancies,
   type Vacancy,
@@ -16,21 +15,13 @@ export default function MisVacantesCliente() {
   const searchParams = useSearchParams();
   const savedId = searchParams.get('guardada');
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
-  const [loading, setLoading] = useState(Boolean(configuredCompanyId));
-  const [error, setError] = useState(
-    configuredCompanyId
-      ? ''
-      : 'No se configuró la empresa cuyas vacantes deben consultarse.',
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
 
-    if (!configuredCompanyId) {
-      return;
-    }
-
-    listVacancies(configuredCompanyId)
+    listVacancies()
       .then((data) => {
         if (active) setVacancies(data);
       })

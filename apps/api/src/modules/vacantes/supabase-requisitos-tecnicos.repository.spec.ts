@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { jest } from '@jest/globals';
 import { createClient } from '@supabase/supabase-js';
 import { SupabaseService } from '../../config/supabase.service';
 import type { RequisitoTecnico } from './contracts/requisito-tecnico';

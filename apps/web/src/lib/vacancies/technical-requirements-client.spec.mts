@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { clearAccessToken, setAccessToken } from '../../shared/services/auth-session.ts';
 import { TechnicalRequirementsClient } from './technical-requirements-client.ts';
 import type { RequisitoTecnico } from './contracts.ts';
+
+beforeEach(() => {
+  const payload = Buffer.from(
+    JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+  ).toString('base64url');
+  setAccessToken(`e30.${payload}.signature`);
+});
+
+afterEach(() => clearAccessToken());
 
 describe('TechnicalRequirementsClient (HU2)', () => {
   it('normaliza nombres de competencias canónicas', () => {
@@ -24,7 +34,7 @@ describe('TechnicalRequirementsClient (HU2)', () => {
       };
       const originalFetch = globalThis.fetch;
       globalThis.fetch = async (input) => {
-        assert.match(String(input), /\/vacantes\/vac-1\/requisitos$/);
+        assert.match(String(input), /\/api\/v1\/vacantes\/vac-1\/requisitos$/);
         return Response.json([requirement]);
       };
 
@@ -134,7 +144,7 @@ describe('TechnicalRequirementsClient (HU2)', () => {
         const body = JSON.parse(String(init.body)) as {
           requisitos: Array<Omit<RequisitoTecnico, 'id' | 'idVacante' | 'fechaCreacion'>>;
         };
-        const match = urlStr.match(/\/vacantes\/([^/]+)\/requisitos/);
+        const match = urlStr.match(/\/api\/v1\/vacantes\/([^/]+)\/requisitos/);
         const vacId = match?.[1] ?? '';
         mockDb[vacId] = body.requisitos.map((r, idx) => ({
           id: `id-${idx}`,

@@ -1,7 +1,5 @@
 import EditarVacanteForm from "./EditarVacanteForm";
 
-export const instant = false;
-
 export default async function EditarVacantePage({
   params,
 }: {

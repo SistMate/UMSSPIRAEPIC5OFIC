@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { clearAccessToken, setAccessToken } from '../../shared/services/auth-session.ts';
 import { indexVacancy, updateVacancy } from './vacantes.ts';
+
+beforeEach(() => {
+  const payload = Buffer.from(
+    JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+  ).toString('base64url');
+  setAccessToken(`e30.${payload}.signature`);
+});
+
+afterEach(() => clearAccessToken());
 
 describe('vacantes API client (HU5)', () => {
   it('actualiza los campos de la vacante manteniendo su identificador', async () => {
@@ -13,7 +23,7 @@ describe('vacantes API client (HU5)', () => {
     const originalFetch = globalThis.fetch;
 
     globalThis.fetch = async (input, init) => {
-      assert.match(String(input), /\/vacantes\/vacante-123$/);
+      assert.match(String(input), /\/api\/v1\/vacantes\/vacante-123$/);
       assert.equal(init?.method, 'PATCH');
       assert.deepEqual(JSON.parse(String(init?.body)), payload);
       return Response.json({ id: vacancyId, ...payload });
@@ -33,7 +43,7 @@ describe('vacantes API client (HU5)', () => {
     const originalFetch = globalThis.fetch;
 
     globalThis.fetch = async (input, init) => {
-      assert.match(String(input), /\/vacantes\/vacante-123\/indexar$/);
+      assert.match(String(input), /\/api\/v1\/vacantes\/vacante-123\/indexar$/);
       assert.equal(init?.method, 'POST');
       return Response.json({
         indexed: true,

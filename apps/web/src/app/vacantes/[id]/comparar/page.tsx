@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   title: 'Comparación de habilidades | UMSSPIRA',
 };
 
-export const instant = false;
-
 export default async function CompararVacantePage({
   params,
 }: {

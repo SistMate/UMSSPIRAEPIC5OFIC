@@ -1,7 +1,5 @@
 import SkillForm from '../../skills/SkillForm';
 
-export const instant = false;
-
 export default async function AgregarHabilidadPage({
   searchParams,
 }: {

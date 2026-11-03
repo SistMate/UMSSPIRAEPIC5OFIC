@@ -26,17 +26,17 @@ export class RequisitoTecnicoItemDto {
   @MaxLength(100, {
     message: 'La competencia técnica no puede superar los 100 caracteres.',
   })
-  competencia: string;
+  competencia!: string;
 
   @IsIn(NIVELES_ESPERADOS, {
     message: 'El nivel esperado debe ser Básico, Intermedio, Avanzado o Experto.',
   })
-  nivel: NivelEsperado;
+  nivel!: NivelEsperado;
 
   @IsIn(TIPOS_REQUISITO, {
     message: 'El tipo debe ser Obligatorio o Deseable.',
   })
-  tipo: TipoRequisito;
+  tipo!: TipoRequisito;
 
   @IsOptional()
   @IsString({ message: 'La descripción opcional debe ser texto.' })

@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BriefcaseBusiness, Save } from 'lucide-react';
 import {
-  configuredCompanyId,
-  configuredCompanyName,
   createVacancy,
 } from '../../../lib/api/vacantes';
 
@@ -23,7 +21,7 @@ export default function NuevaVacantePage() {
 const router = useRouter();
 
 const [title, setTitle] = useState('');
-const [company] = useState(configuredCompanyName);
+const company = 'Empresa asociada a tu cuenta';
 const [area, setArea] = useState('');
 const [location, setLocation] = useState('');
 const [modality, setModality] = useState('');
@@ -43,32 +41,12 @@ setSaveError('');
 const newErrors: string[] = [];
 
 if (!title.trim()) newErrors.push('El cargo de la vacante es obligatorio.');
-if (!company.trim()) newErrors.push('El nombre de la empresa es obligatorio.');
 if (!area) newErrors.push('Selecciona un área profesional.');
 if (!location.trim()) newErrors.push('La ubicación es obligatoria.');
 if (!modality) newErrors.push('Selecciona una modalidad de trabajo.');
 if (!description.trim()) newErrors.push('La descripción es obligatoria.');
 if (!requirements.trim()) newErrors.push('Debes registrar al menos un requisito.');
 if (!conditions.trim()) newErrors.push('Las condiciones de trabajo son obligatorias.');
-if (!configuredCompanyId) {
-  newErrors.push(
-    'Configura NEXT_PUBLIC_EMPRESA_ID en apps/web/.env.local con el UUID de una empresa existente.',
-  );
-} else if (
-  !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    configuredCompanyId,
-  )
-) {
-  newErrors.push(
-    'NEXT_PUBLIC_EMPRESA_ID debe ser un UUID válido de una empresa existente.',
-  );
-}
-if (!configuredCompanyName) {
-  newErrors.push(
-    'Configura NEXT_PUBLIC_EMPRESA_NAME en apps/web/.env.local con el nombre de la empresa.',
-  );
-}
-
 if (title.trim().length > 100) {
   newErrors.push('El cargo no puede superar los 100 caracteres.');
 }
@@ -85,7 +63,6 @@ if (newErrors.length > 0) {
     try {
       setIsSaving(true);
       const vacancy = await createVacancy({
-        idEmpresa: configuredCompanyId,
         titulo: title.trim(),
         modalidad: modality,
         descripcion: description.trim(),
@@ -197,7 +174,7 @@ Volver a vacantes </Link>
             id="company"
             value={company}
             readOnly
-            placeholder="Configura NEXT_PUBLIC_EMPRESA_NAME"
+            placeholder="Se obtiene de tu cuenta"
             className="w-full rounded-md border border-gray-200 bg-gray-100 px-3 py-3 text-sm text-gray-700 outline-none"
           />
         </div>

@@ -7,5 +7,5 @@ export class AsociarRequisitosDto {
   @ArrayNotEmpty({ message: 'Debe incluir al menos un requisito técnico.' })
   @ValidateNested({ each: true })
   @Type(() => RequisitoTecnicoItemDto)
-  requisitos: RequisitoTecnicoItemDto[];
+  requisitos!: RequisitoTecnicoItemDto[];
 }

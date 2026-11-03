@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   title: 'Detalle de habilidad pendiente | UMSSPIRA',
 };
 
-export const instant = false;
-
 export default async function DetalleHabilidadPage({
   params,
 }: {

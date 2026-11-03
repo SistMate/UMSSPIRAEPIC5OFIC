@@ -1,8 +1,6 @@
 import { Suspense } from 'react';
 import PostularVacanteCliente from './PostularVacanteCliente';
 
-export const instant = false;
-
 export default async function PostularVacantePage({
 params,
 }: {

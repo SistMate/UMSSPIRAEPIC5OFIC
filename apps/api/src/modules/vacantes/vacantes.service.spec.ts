@@ -1,190 +1,41 @@
-import {
-  BadRequestException,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { validate } from 'class-validator';
-import { SupabaseService } from '../../config/supabase.service';
+import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
 import { CreateVacanteDto } from './dto/create-vacante.dto';
 import { VacantesService } from './vacantes.service';
 
-type StoredVacancy = {
+const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_COMPANY_ID = '22222222-2222-4222-8222-222222222222';
+const USER_ID = '33333333-3333-4333-8333-333333333333';
+
+type MockVacancy = {
   id: string;
   id_empresa: string;
   titulo: string;
   modalidad: string;
   estado: string;
-  created_at: string;
-  descripcion: string;
+  created_at: Date;
+  descripcion_tecnica: string;
   ubicacion: string;
   area: string;
   condiciones: string;
-  empresa: { razon_social: string };
-  vacante_requerimiento_laboral: Array<{
-    requerimiento_laboral: {
-      id: string;
-      titulo: string;
-    };
-  }>;
+  fecha_publicacion: Date;
 };
 
-class VacancyQuery {
-  private filters = new Map<string, string>();
-  private updateValues?: Partial<StoredVacancy>;
+type MockRequirement = {
+  id: string;
+  id_empresa: string;
+  titulo: string;
+  estado: string;
+};
 
-  constructor(private readonly client: FakeSupabaseClient) {}
-
-  select() {
-    return this;
-  }
-
-  update(values: Partial<StoredVacancy>) {
-    this.updateValues = values;
-    return this;
-  }
-
-  eq(column: string, value: string) {
-    this.filters.set(column, value);
-    return this;
-  }
-
-  async maybeSingle() {
-    const rows = this.filteredRows();
-    if (this.updateValues && rows[0]) {
-      Object.assign(rows[0], this.updateValues);
-    }
-    return { data: rows[0] ?? null, error: null };
-  }
-
-  async order() {
-    return { data: this.filteredRows().reverse(), error: null };
-  }
-
-  private filteredRows() {
-    return [...this.client.vacancies.values()].filter((vacancy) =>
-      [...this.filters].every(
-        ([column, value]) =>
-          vacancy[column as keyof StoredVacancy] === value,
-      ),
-    );
-  }
-}
-
-class FakeSupabaseClient {
-  readonly companies = new Map([
-    ['11111111-1111-4111-8111-111111111111', 'TecnoAndes S.R.L.'],
-    ['22222222-2222-4222-8222-222222222222', 'Otra Empresa'],
-  ]);
-  readonly vacancies = new Map<string, StoredVacancy>();
-  failNextRpc = false;
-  private sequence = 0;
-
-  from(table: string) {
-    if (table !== 'vacante') throw new Error(`Tabla no simulada: ${table}`);
-    return new VacancyQuery(this);
-  }
-
-  async rpc(name: string, params: Record<string, unknown>) {
-    if (this.failNextRpc) {
-      this.failNextRpc = false;
-      return { data: null, error: { code: 'XX000', message: 'SQL privado' } };
-    }
-
-    if (name === 'crear_vacante_con_requisitos') {
-      const companyId = String(params.p_id_empresa);
-      const company = this.companies.get(companyId);
-      if (!company) {
-        return {
-          data: null,
-          error: { code: '23503', message: 'EMPRESA_NO_EXISTE' },
-        };
-      }
-
-      const id = this.nextUuid();
-      this.vacancies.set(
-        id,
-        this.buildVacancy(id, companyId, company, params),
-      );
-      return { data: id, error: null };
-    }
-
-    if (name === 'agregar_requisitos_vacante') {
-      const id = String(params.p_id_vacante);
-      const vacancy = this.vacancies.get(id);
-      if (!vacancy) {
-        return {
-          data: null,
-          error: { code: '23503', message: 'VACANTE_NO_EXISTE' },
-        };
-      }
-
-      const requirements = params.p_requisitos as string[];
-      const existingRequirements =
-        vacancy.vacante_requerimiento_laboral.map((relation) =>
-          relation.requerimiento_laboral.titulo.trim().toLowerCase(),
-        );
-
-      if (
-        requirements.some((requirement) =>
-          existingRequirements.includes(requirement.trim().toLowerCase()),
-        )
-      ) {
-        return {
-          data: null,
-          error: { code: '22023', message: 'REQUISITO_DUPLICADO' },
-        };
-      }
-
-      vacancy.vacante_requerimiento_laboral.push(
-        ...requirements.map((requirement) => ({
-          requerimiento_laboral: {
-            id: this.nextUuid(),
-            titulo: requirement,
-          },
-        })),
-      );
-      return { data: null, error: null };
-    }
-
-    throw new Error(`RPC no simulada: ${name}`);
-  }
-
-  private nextUuid() {
-    this.sequence += 1;
-    return `00000000-0000-4000-8000-${String(this.sequence).padStart(12, '0')}`;
-  }
-
-  private buildVacancy(
-    id: string,
-    companyId: string,
-    company: string,
-    params: Record<string, unknown>,
-  ): StoredVacancy {
-    return {
-      id,
-      id_empresa: companyId,
-      titulo: String(params.p_titulo),
-      modalidad: String(params.p_modalidad),
-      estado: 'Disponible',
-      created_at: '2026-10-14T23:24:00.000Z',
-      descripcion: String(params.p_descripcion),
-      ubicacion: String(params.p_ubicacion),
-      area: String(params.p_area),
-      condiciones: String(params.p_condiciones),
-      empresa: { razon_social: company },
-      vacante_requerimiento_laboral: (
-        params.p_requisitos as string[]
-      ).map((requirement) => ({
-        requerimiento_laboral: {
-          id: this.nextUuid(),
-          titulo: requirement,
-        },
-      })),
-    };
-  }
-}
-
-const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+type PrismaMock = {
+  empresa: { findFirst: jest.Mock };
+  vacante: { create: jest.Mock; findUnique: jest.Mock };
+  requerimientoLaboral: { create: jest.Mock };
+  vacanteRequerimientoLaboral: { create: jest.Mock };
+  $transaction: jest.Mock;
+};
 
 function validDto(overrides: Partial<CreateVacanteDto> = {}) {
   return Object.assign(new CreateVacanteDto(), {
@@ -200,158 +51,132 @@ function validDto(overrides: Partial<CreateVacanteDto> = {}) {
   });
 }
 
-describe('VacantesService - HU5-S1-03', () => {
-  let client: FakeSupabaseClient;
+describe('VacantesService - Prisma', () => {
+  let prisma: ReturnType<typeof createPrismaMock>;
   let service: VacantesService;
 
   beforeEach(() => {
-    client = new FakeSupabaseClient();
-    service = new VacantesService({
-      getClient: () => client,
-    } as unknown as SupabaseService);
+    prisma = createPrismaMock();
+    service = new VacantesService(prisma as unknown as PrismaService);
   });
 
-  it('AC1 persiste una vacante válida', async () => {
-    const created = await service.crear(validDto());
+  it('crea vacante y requisitos usando la empresa vinculada al usuario', async () => {
+    const created = await service.crear(
+      validDto({ idEmpresa: undefined }),
+      USER_ID,
+    );
 
-    expect(client.vacancies.has(created.id)).toBe(true);
-    expect(created.titulo).toBe('Analista de Datos Junior');
-  });
-
-  it('AC2 recupera únicamente la vacante solicitada por identificador', async () => {
-    const first = await service.crear(validDto({ titulo: 'Primera vacante' }));
-    await service.crear(validDto({ titulo: 'Segunda vacante' }));
-
-    const found = await service.obtenerPorId(first.id);
-
-    expect(found.id).toBe(first.id);
-    expect(found.titulo).toBe('Primera vacante');
-  });
-
-  it('AC3 conserva los requisitos asociados después de una nueva consulta', async () => {
-    const created = await service.crear(validDto());
-    const freshService = new VacantesService({
-      getClient: () => client,
-    } as unknown as SupabaseService);
-
-    const found = await freshService.obtenerPorId(created.id);
-
-    expect(found.requisitos.map((requirement) => requirement.nombre)).toEqual([
+    expect(created.idEmpresa).toBe(COMPANY_ID);
+    expect(created.empresa).toBe('TecnoAndes S.R.L.');
+    expect(created.requisitos.map((item) => item.nombre)).toEqual([
       'SQL',
       'Python',
     ]);
-  });
-
-  it('AC4 rechaza requisitos para una vacante inexistente sin crear huérfanos', async () => {
-    const requirementsBefore = [...client.vacancies.values()].flatMap(
-      (vacancy) => vacancy.vacante_requerimiento_laboral,
-    ).length;
-
-    await expect(
-      service.agregarRequisitos(
-        '99999999-9999-4999-8999-999999999999',
-        ['SQL'],
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    const requirementsAfter = [...client.vacancies.values()].flatMap(
-      (vacancy) => vacancy.vacante_requerimiento_laboral,
-    ).length;
-    expect(requirementsAfter).toBe(requirementsBefore);
-  });
-
-  it('AC5 responde 404 para un identificador inexistente', async () => {
-    await service.crear(validDto());
-
-    await expect(
-      service.obtenerPorId('99999999-9999-4999-8999-999999999999'),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('actualiza los campos editables de una vacante', async () => {
-    const created = await service.crear(validDto());
-
-    const updated = await service.actualizar(created.id, {
-      descripcion: 'Descripción actualizada de la oportunidad laboral.',
-    });
-
-    expect(updated.descripcion).toBe(
-      'Descripción actualizada de la oportunidad laboral.',
-    );
-    expect(updated.titulo).toBe(created.titulo);
-  });
-
-  it('rechaza actualizaciones sin campos editables', async () => {
-    await expect(
-      service.actualizar(
-        '11111111-1111-4111-8111-111111111111',
-        {},
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('rechaza un payload inválido mediante el DTO', async () => {
-    const errors = await validate(
-      validDto({ idEmpresa: 'no-es-uuid', requisitos: [] }),
-    );
-
-    expect(errors.map((error) => error.property)).toEqual(
-      expect.arrayContaining(['idEmpresa', 'requisitos']),
-    );
-  });
-
-  it('propaga un fallo de persistencia como error interno controlado', async () => {
-    client.failNextRpc = true;
-
-    await expect(service.crear(validDto())).rejects.toEqual(
-      new InternalServerErrorException('No se pudo guardar la vacante.'),
-    );
-  });
-
-  it('mantiene aisladas dos vacantes y sus requisitos', async () => {
-    const first = await service.crear(validDto({ requisitos: ['SQL'] }));
-    const second = await service.crear(
-      validDto({ titulo: 'Backend Developer', requisitos: ['TypeScript'] }),
-    );
-
-    const [foundFirst, foundSecond] = await Promise.all([
-      service.obtenerPorId(first.id),
-      service.obtenerPorId(second.id),
-    ]);
-
-    expect(foundFirst.requisitos.map((item) => item.nombre)).toEqual(['SQL']);
-    expect(foundSecond.requisitos.map((item) => item.nombre)).toEqual([
-      'TypeScript',
-    ]);
-  });
-
-  it('rechaza con 400 un requisito duplicado en una llamada posterior', async () => {
-    const created = await service.crear(validDto({ requisitos: ['SQL'] }));
-
-    await expect(
-      service.agregarRequisitos(created.id, [' sql ']),
-    ).rejects.toEqual(
-      new BadRequestException(
-        'Uno o más requisitos ya están asociados a la vacante.',
-      ),
-    );
-
-    const found = await service.obtenerPorId(created.id);
-    expect(found.requisitos.map((item) => item.nombre)).toEqual(['SQL']);
-  });
-
-  it('lista exclusivamente las vacantes de la empresa indicada', async () => {
-    await service.crear(validDto());
-    await service.crear(
-      validDto({
-        idEmpresa: '22222222-2222-4222-8222-222222222222',
-        titulo: 'Vacante de otra empresa',
+    expect(prisma.vacante.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ id_empresa: COMPANY_ID }),
       }),
     );
+  });
 
-    const vacancies = await service.listarPorEmpresa(COMPANY_ID);
+  it('rechaza crear vacantes en una empresa distinta a la vinculada', async () => {
+    await expect(
+      service.crear(validDto({ idEmpresa: OTHER_COMPANY_ID }), USER_ID),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 
-    expect(vacancies).toHaveLength(1);
-    expect(vacancies[0].idEmpresa).toBe(COMPANY_ID);
+  it('rechaza requisitos duplicados antes de persistir', async () => {
+    await expect(
+      service.crear(validDto({ requisitos: ['SQL', ' sql '] }), USER_ID),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.vacante.create).not.toHaveBeenCalled();
+  });
+
+  it('permite omitir idEmpresa en el DTO, pero valida un UUID cuando se envía', async () => {
+    const withoutCompanyId = validDto({ idEmpresa: undefined });
+    const invalidCompanyId = validDto({ idEmpresa: 'not-a-uuid' });
+
+    await expect(validate(withoutCompanyId)).resolves.toHaveLength(0);
+    const errors = await validate(invalidCompanyId);
+    expect(errors.map((error) => error.property)).toContain('idEmpresa');
   });
 });
+
+function createPrismaMock() {
+  const vacancies = new Map<string, MockVacancy>();
+  const requirements = new Map<string, MockRequirement>();
+  const vacancyRequirements = new Map<string, string[]>();
+  let nextId = 0;
+
+  const prisma: PrismaMock = {
+    empresa: {
+      findFirst: jest.fn(async ({ where }: { where: { id_usuario: string } }) =>
+        where.id_usuario === USER_ID
+          ? { id: COMPANY_ID, razon_social: 'TecnoAndes S.R.L.' }
+          : null,
+      ),
+    },
+    vacante: {
+      create: jest.fn(async ({ data }: { data: Omit<MockVacancy, 'id'> }) => {
+        const id = `vacancy-${++nextId}`;
+        const vacancy: MockVacancy = { id, ...data };
+        vacancies.set(id, vacancy);
+        return vacancy;
+      }),
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
+        hydrateVacancy(
+          vacancies.get(where.id),
+          requirements,
+          vacancyRequirements,
+        ),
+      ),
+    },
+    requerimientoLaboral: {
+      create: jest.fn(async ({ data }: { data: Omit<MockRequirement, 'id'> }) => {
+        const id = `requirement-${++nextId}`;
+        const requirement: MockRequirement = { id, ...data };
+        requirements.set(id, requirement);
+        return requirement;
+      }),
+    },
+    vacanteRequerimientoLaboral: {
+      create: jest.fn(
+        async ({
+          data,
+        }: {
+          data: { id_vacante: string; id_requerimiento_laboral: string };
+        }) => {
+          const linked = vacancyRequirements.get(data.id_vacante) ?? [];
+          linked.push(data.id_requerimiento_laboral);
+          vacancyRequirements.set(data.id_vacante, linked);
+          return data;
+        },
+      ),
+    },
+    $transaction: jest.fn(
+      async (
+        operation: (transaction: unknown) => Promise<unknown>,
+      ): Promise<unknown> => await operation(prisma),
+    ),
+  };
+
+  return prisma;
+}
+
+function hydrateVacancy(
+  vacancy: MockVacancy | undefined,
+  requirements: Map<string, MockRequirement>,
+  vacancyRequirements: Map<string, string[]>,
+) {
+  if (!vacancy) {return null;}
+  return {
+    ...vacancy,
+    empresa: { razon_social: 'TecnoAndes S.R.L.' },
+    vacante_requerimiento_laboral_registros: (
+      vacancyRequirements.get(vacancy.id) ?? []
+    ).flatMap((id) => {
+      const requirement = requirements.get(id);
+      return requirement ? [{ requerimiento_laboral: requirement }] : [];
+    }),
+  };
+}

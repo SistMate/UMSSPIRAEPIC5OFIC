@@ -2,8 +2,18 @@
   "info": {
     "_postman_id": "4f294e79-fca7-41e9-9b96-fc4544a9d684",
     "name": "UMSSPIRA API",
-    "description": "Pruebas locales del portal. Configura el environment local; las operaciones de datos requieren Supabase y la búsqueda requiere Elasticsearch.",
+    "description": "Pruebas locales de UMSSPIRA. Las vacantes y sus requisitos usan la API autenticada de Epic5 y PostgreSQL/Prisma. Configura accessToken con un token de una cuenta asociada a una empresa. La búsqueda requiere Elasticsearch.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
@@ -14,7 +24,10 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/"
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{apiUrl}}/health"
           }
         }
       ]
@@ -27,11 +40,14 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"titulo\": \"Analista de Datos Junior\",\n  \"idEmpresa\": \"{{companyId}}\",\n  \"estado\": \"Disponible\",\n  \"requisitosTecnicos\": {\n    \"requerimientoLaboralIds\": []\n  }\n}"
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"titulo\": \"Analista de Datos Junior\",\n  \"idEmpresa\": \"{{$guid}}\",\n  \"estado\": \"Disponible\",\n  \"requisitosTecnicos\": {\n    \"requerimientoLaboralIds\": []\n  }\n}"
             },
-            "url": "{{apiUrl}}/vacantes/estructura/validar"
+            "url": "{{apiUrl}}/api/v1/vacantes/estructura/validar"
           }
         },
         {
@@ -55,17 +71,17 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idEmpresa\": \"{{companyId}}\",\n  \"titulo\": \"Analista de Datos Junior\",\n  \"modalidad\": \"Híbrido\",\n  \"descripcion\": \"Analiza información y prepara reportes para apoyar decisiones de negocio.\",\n  \"ubicacion\": \"Cochabamba\",\n  \"area\": \"Datos y Analítica\",\n  \"condiciones\": \"Jornada completa\",\n  \"requisitos\": [\"SQL\", \"Python\"]\n}"
+              "raw": "{\n  \"titulo\": \"Analista de Datos Junior\",\n  \"modalidad\": \"Híbrido\",\n  \"descripcion\": \"Analiza información y prepara reportes para apoyar decisiones de negocio.\",\n  \"ubicacion\": \"Cochabamba\",\n  \"area\": \"Datos y Analítica\",\n  \"condiciones\": \"Jornada completa\",\n  \"requisitos\": [\"SQL\", \"Python\"]\n}"
             },
-            "url": "{{apiUrl}}/vacantes"
+            "url": "{{apiUrl}}/api/v1/vacantes"
           }
         },
         {
-          "name": "Listar vacantes de empresa",
+          "name": "Listar mis vacantes",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/vacantes?idEmpresa={{companyId}}"
+            "url": "{{apiUrl}}/api/v1/vacantes/mis-vacantes"
           }
         },
         {
@@ -73,7 +89,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}"
           }
         },
         {
@@ -85,7 +101,7 @@
               "mode": "raw",
               "raw": "{\n  \"descripcion\": \"Descripción actualizada de la oportunidad laboral.\"\n}"
             },
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}"
           }
         },
         {
@@ -93,7 +109,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/indexar"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/indexar"
           }
         },
         {
@@ -101,7 +117,10 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/buscar?q=analista"
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{apiUrl}}/api/v1/vacantes/buscar?q=analista"
           }
         },
         {
@@ -127,7 +146,7 @@
               "mode": "raw",
               "raw": "{\n  \"requisitos\": [\n    {\n      \"competencia\": \"SQL\",\n      \"nivel\": \"Intermedio\",\n      \"tipo\": \"Obligatorio\",\n      \"descripcion\": \"Consultas y transformación de datos\"\n    }\n  ]\n}"
             },
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/requisitos"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/requisitos"
           }
         },
         {
@@ -135,7 +154,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/requisitos"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/requisitos"
           }
         },
         {
@@ -143,7 +162,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/requisitos/matching"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/requisitos/matching"
           }
         },
         {
@@ -155,7 +174,7 @@
               "mode": "raw",
               "raw": "{\n  \"nivel\": \"Avanzado\",\n  \"tipo\": \"Deseable\",\n  \"descripcion\": \"Experiencia práctica con consultas complejas\"\n}"
             },
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/requisitos/{{technicalRequirementId}}"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/requisitos/{{technicalRequirementId}}"
           }
         },
         {
@@ -163,7 +182,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{apiUrl}}/vacantes/{{vacancyId}}/requisitos/{{technicalRequirementId}}"
+            "url": "{{apiUrl}}/api/v1/vacantes/{{vacancyId}}/requisitos/{{technicalRequirementId}}"
           }
         }
       ]
@@ -176,7 +195,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/formacion-academica?idEgresado={{egresadoId}}"
+            "url": "{{apiUrl}}/api/v1/formacion-academica?idEgresado={{egresadoId}}"
           }
         },
         {
@@ -202,7 +221,7 @@
               "mode": "raw",
               "raw": "{\n  \"idEgresado\": \"{{egresadoId}}\",\n  \"idCarrera\": null,\n  \"tipoFormacion\": \"Bachiller\",\n  \"institucion\": \"Unidad Educativa\",\n  \"titulo\": \"Bachiller\",\n  \"nivelAcademico\": \"Secundario\",\n  \"estado\": \"Titulado\",\n  \"anioInicio\": 2010,\n  \"anioFin\": 2015\n}"
             },
-            "url": "{{apiUrl}}/formacion-academica"
+            "url": "{{apiUrl}}/api/v1/formacion-academica"
           }
         }
       ]
@@ -219,7 +238,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{apiUrl}}/experiencias-laborales"
+            "url": "{{apiUrl}}/api/v1/experiencias-laborales"
           }
         },
         {
@@ -235,7 +254,7 @@
               "mode": "raw",
               "raw": "{\n  \"company\": \"Empresa de ejemplo\",\n  \"position\": \"Analista\",\n  \"description\": \"Análisis y elaboración de reportes.\",\n  \"employmentType\": \"Tiempo completo\",\n  \"startDate\": \"2023-01-01\",\n  \"currentlyWorking\": true,\n  \"endDate\": null\n}"
             },
-            "url": "{{apiUrl}}/experiencias-laborales"
+            "url": "{{apiUrl}}/api/v1/experiencias-laborales"
           }
         }
       ]

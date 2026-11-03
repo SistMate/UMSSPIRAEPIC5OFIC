@@ -3,42 +3,51 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/vacancies/client.spec.mts src/lib/vacancies/technical-requirements-client.spec.mts src/lib/api/vacantes.spec.mts src/lib/vacancies/vacancy-editing.spec.mts",
-    "test:jest": "jest --passWithNoTests",
+    "lint": "next lint",
+    "test": "jest --passWithNoTests",
+    "test:features": "tsx --test src/lib/vacancies/client.spec.mts src/lib/vacancies/technical-requirements-client.spec.mts src/lib/api/vacantes.spec.mts src/lib/vacancies/vacancy-editing.spec.mts",
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@serwist/next": "^9.5.13",
+    "@supabase/supabase-js": "^2.117.2",
     "@umsspira/shared-types": "workspace:*",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.55.0",
-    "next": "16.4.3",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "tailwind-merge": "^3.4.0"
+    "lucide-react": "^0.468.0",
+    "next": "14.2.3",
+    "qrcode.react": "^4.2.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hook-form": "^7.89.0",
+    "react-pdf": "^9.2.1",
+    "socket.io-client": "^4.8.4",
+    "tailwind-merge": "^2.3.0",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
-    "@tailwindcss/turbopack": "^4.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
     "autoprefixer": "^10.6.1",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "16.4.3",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.3",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
-    "postcss": "^8.0.0",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.0.0"
+    "postcss": "^8",
+    "serwist": "^9.5.13",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
   }
 }

@@ -1,402 +1,341 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { SupabaseService } from '../../config/supabase.service';
-import { CreateVacanteDto } from './dto/create-vacante.dto';
-import { UpdateVacanteDto } from './dto/update-vacante.dto';
+import { Prisma } from '../../generated/prisma/client';
+import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
+import type { CreateVacanteDto } from './dto/create-vacante.dto';
 
-interface EmpresaRow {
-  razon_social: string | null;
+export interface UpdateVacanteData {
+  titulo?: string;
+  modalidad?: string;
+  nivel_experiencia?: string;
+  descripcion_tecnica?: string;
+  descripcion?: string;
+  ubicacion?: string;
+  area?: string;
+  condiciones?: string;
+  estado?: string;
 }
 
-interface RequerimientoRow {
-  id: string;
-  titulo: string | null;
-}
+const VACANTE_INCLUDE = {
+  empresa: true,
+  vacante_requerimiento_laboral_registros: {
+    include: { requerimiento_laboral: true },
+  },
+} satisfies Prisma.VacanteInclude;
 
-interface VacanteRequerimientoRow {
-  requerimiento_laboral: RequerimientoRow | RequerimientoRow[] | null;
-}
+type VacanteWithRelations = Prisma.VacanteGetPayload<{
+  include: typeof VACANTE_INCLUDE;
+}>;
 
-interface VacanteRow {
-  id: string;
-  id_empresa: string;
-  titulo: string | null;
-  modalidad: string | null;
-  estado: string | null;
-  created_at: string | null;
-  descripcion: string | null;
-  ubicacion: string | null;
-  area: string | null;
-  condiciones: string | null;
-  empresa: EmpresaRow | EmpresaRow[] | null;
-  vacante_requerimiento_laboral: VacanteRequerimientoRow[] | null;
-}
-
-interface SupabaseErrorLike {
-  code?: string;
-  message?: string;
-}
-
-type FilaVacante = Record<string, any>;
-
-const VACANTE_SELECT = `
-  id,
-  id_empresa,
-  titulo,
-  modalidad,
-  estado,
-  created_at,
-  descripcion,
-  ubicacion,
-  area,
-  condiciones,
-  empresa!fk_vacante_empresa(razon_social),
-  vacante_requerimiento_laboral(
-    requerimiento_laboral!fk_vac_req_requerimiento(
-      id,
-      titulo
-    )
-  )
-`;
-
-// Provisional para HU3; Equipo 4 definirá el catálogo oficial de estados.
-const PROVISIONAL_VACANCY_STATUS = 'Disponible';
+const AVAILABLE_STATES = new Set([
+  'publicada',
+  'publicado',
+  'publicada y vigente',
+  'vigente',
+  'abierta',
+  'activo',
+  'activa',
+  'published',
+  'open',
+  'disponible',
+]);
 
 @Injectable()
 export class VacantesService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  private get db() {
-    return this.supabaseService.getClient();
+  async obtenerMisVacantes(idUsuario: string) {
+    const empresa = await this.empresaDelUsuario(idUsuario);
+    if (!empresa) {return [];}
+
+    const vacancies = await this.prisma.vacante.findMany({
+      where: { id_empresa: empresa.id },
+      include: VACANTE_INCLUDE,
+      orderBy: { created_at: 'desc' },
+    });
+    return vacancies.map((vacancy) => this.mapVacante(vacancy));
   }
 
-  private get adminDb() {
-    return this.supabaseService.getAdminClient();
+  async obtenerVacantePorId(idVacante: string, idUsuario: string) {
+    const empresa = await this.empresaDelUsuario(idUsuario);
+    if (!empresa) {
+      throw new NotFoundException('Empresa no encontrada.');
+    }
+
+    const vacancy = await this.prisma.vacante.findFirst({
+      where: { id: idVacante, id_empresa: empresa.id },
+      include: VACANTE_INCLUDE,
+    });
+    if (!vacancy) {
+      throw new NotFoundException('Vacante no encontrada o sin permiso.');
+    }
+    return this.mapVacante(vacancy);
   }
 
-  private firstRelation<T>(relation: T | T[] | null): T | null {
-    return Array.isArray(relation) ? (relation[0] ?? null) : relation;
+  async crear(dto: CreateVacanteDto, idUsuario: string) {
+    const empresa = await this.empresaDelUsuario(idUsuario);
+    if (!empresa) {
+      throw new NotFoundException(
+        'La cuenta no tiene una empresa asociada para publicar vacantes.',
+      );
+    }
+    if (dto.idEmpresa && dto.idEmpresa !== empresa.id) {
+      throw new ForbiddenException(
+        'La vacante debe pertenecer a la empresa asociada a tu cuenta.',
+      );
+    }
+
+    const requisitos = this.normalizeRequirements(dto.requisitos);
+    const idVacante = await this.prisma.$transaction(async (transaction) => {
+      const vacancy = await transaction.vacante.create({
+        data: {
+          id_empresa: empresa.id,
+          titulo: dto.titulo.trim(),
+          modalidad: dto.modalidad.trim(),
+          descripcion_tecnica: dto.descripcion.trim(),
+          ubicacion: dto.ubicacion.trim(),
+          area: dto.area.trim(),
+          condiciones: dto.condiciones.trim(),
+          estado: 'PUBLICADO',
+          created_at: new Date(),
+          fecha_publicacion: new Date(),
+        },
+      });
+
+      for (const titulo of requisitos) {
+        const requirement = await transaction.requerimientoLaboral.create({
+          data: {
+            id_empresa: empresa.id,
+            titulo,
+            estado: 'PUBLICADO',
+          },
+        });
+        await transaction.vacanteRequerimientoLaboral.create({
+          data: {
+            id_vacante: vacancy.id,
+            id_requerimiento_laboral: requirement.id,
+          },
+        });
+      }
+
+      return vacancy.id;
+    });
+
+    return this.obtenerPorId(idVacante);
   }
 
-  private mapVacante(row: VacanteRow) {
-    const empresa = this.firstRelation(row.empresa);
+  async obtenerPorId(idVacante: string) {
+    const vacancy = await this.prisma.vacante.findUnique({
+      where: { id: idVacante },
+      include: VACANTE_INCLUDE,
+    });
+    if (!vacancy) {
+      throw new NotFoundException('La vacante no existe.');
+    }
+    return this.mapVacante(vacancy);
+  }
 
+  async listarPorEmpresa(idEmpresa: string) {
+    const vacancies = await this.prisma.vacante.findMany({
+      where: { id_empresa: idEmpresa },
+      include: VACANTE_INCLUDE,
+      orderBy: { created_at: 'desc' },
+    });
+    return vacancies.map((vacancy) => this.mapVacante(vacancy));
+  }
+
+  async agregarRequisitos(idVacante: string, requirements: string[]) {
+    const vacancy = await this.prisma.vacante.findUnique({
+      where: { id: idVacante },
+      select: { id_empresa: true },
+    });
+    if (!vacancy) {
+      throw new NotFoundException('La vacante indicada no existe.');
+    }
+
+    const requisitos = this.normalizeRequirements(requirements);
+    await this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.vacanteRequerimientoLaboral.findMany({
+        where: { id_vacante: idVacante },
+        include: { requerimiento_laboral: true },
+      });
+      const existingNames = new Set(
+        existing.flatMap((item) =>
+          item.requerimiento_laboral?.titulo
+            ? [this.canonicalName(item.requerimiento_laboral.titulo)]
+            : [],
+        ),
+      );
+
+      for (const titulo of requisitos) {
+        if (existingNames.has(this.canonicalName(titulo))) {
+          throw new BadRequestException(
+            `El requisito '${titulo}' ya está asociado a esta vacante.`,
+          );
+        }
+
+        const requirement = await transaction.requerimientoLaboral.create({
+          data: {
+            id_empresa: vacancy.id_empresa,
+            titulo,
+            estado: 'PUBLICADO',
+          },
+        });
+        await transaction.vacanteRequerimientoLaboral.create({
+          data: {
+            id_vacante: idVacante,
+            id_requerimiento_laboral: requirement.id,
+          },
+        });
+        existingNames.add(this.canonicalName(titulo));
+      }
+    });
+
+    return this.obtenerPorId(idVacante);
+  }
+
+  async consultarDisponibilidad(buscar?: string) {
+    const rows = await this.prisma.vacante.findMany({
+      include: VACANTE_INCLUDE,
+      orderBy: { created_at: 'desc' },
+    });
+    const term = buscar?.trim().toLocaleLowerCase();
+    const vacancies = rows
+      .filter((vacancy) => this.estaDisponible(vacancy))
+      .filter((vacancy) => {
+        if (!term) {return true;}
+        const mapped = this.mapVacante(vacancy);
+        return [
+          mapped.titulo,
+          mapped.empresa,
+          mapped.descripcion,
+          mapped.ubicacion,
+          mapped.area,
+        ].some(
+          (value) =>
+            typeof value === 'string' &&
+            value.toLocaleLowerCase().includes(term),
+        );
+      })
+      .map((vacancy) => this.mapVacante(vacancy));
+
+    return { total: vacancies.length, vacantes: vacancies };
+  }
+
+  async cerrarVacante(idVacante: string, idUsuario: string) {
+    await this.ensureOwnedVacancy(idVacante, idUsuario);
+    return this.prisma.vacante.update({
+      where: { id: idVacante },
+      data: { estado: 'CERRADA', fecha_cierre: new Date() },
+    });
+  }
+
+  async actualizarVacante(
+    idVacante: string,
+    idUsuario: string,
+    data: UpdateVacanteData,
+  ) {
+    await this.ensureOwnedVacancy(idVacante, idUsuario);
+    const description = data.descripcion_tecnica ?? data.descripcion;
+    return this.prisma.vacante.update({
+      where: { id: idVacante },
+      data: {
+        titulo: data.titulo?.trim(),
+        modalidad: data.modalidad?.trim(),
+        nivel_experiencia: data.nivel_experiencia?.trim(),
+        descripcion_tecnica: description?.trim(),
+        ubicacion: data.ubicacion?.trim(),
+        area: data.area?.trim(),
+        condiciones: data.condiciones?.trim(),
+        estado: data.estado?.trim(),
+      },
+    });
+  }
+
+  async eliminarVacante(idVacante: string, idUsuario: string) {
+    await this.ensureOwnedVacancy(idVacante, idUsuario);
+    return this.prisma.vacante.delete({ where: { id: idVacante } });
+  }
+
+  private async empresaDelUsuario(idUsuario: string) {
+    return this.prisma.empresa.findFirst({
+      where: { id_usuario: idUsuario },
+    });
+  }
+
+  private async ensureOwnedVacancy(idVacante: string, idUsuario: string) {
+    const vacancy = await this.obtenerVacantePorId(idVacante, idUsuario);
+    if (!vacancy) {
+      throw new NotFoundException('Vacante no encontrada o sin permiso.');
+    }
+  }
+
+  private mapVacante(vacancy: VacanteWithRelations) {
     return {
-      id: row.id,
-      idEmpresa: row.id_empresa,
-      empresa: empresa?.razon_social ?? 'Empresa sin nombre registrado',
-      titulo: row.titulo ?? '',
-      modalidad: row.modalidad ?? '',
-      estado: row.estado ?? PROVISIONAL_VACANCY_STATUS,
-      fechaCreacion: row.created_at,
-      descripcion: row.descripcion ?? '',
-      ubicacion: row.ubicacion ?? '',
-      area: row.area ?? '',
-      condiciones: row.condiciones ?? '',
-      requisitos: this.mapRequirements(row.vacante_requerimiento_laboral),
+      ...vacancy,
+      titulo: vacancy.titulo ?? '',
+      modalidad: vacancy.modalidad ?? '',
+      estado: vacancy.estado ?? '',
+      idEmpresa: vacancy.id_empresa ?? '',
+      empresa: vacancy.empresa?.razon_social ?? 'Empresa sin nombre registrado',
+      fechaCreacion: vacancy.created_at?.toISOString() ?? null,
+      descripcion: vacancy.descripcion_tecnica ?? '',
+      ubicacion: vacancy.ubicacion ?? '',
+      area: vacancy.area ?? '',
+      condiciones: vacancy.condiciones ?? '',
+      requisitos: vacancy.vacante_requerimiento_laboral_registros.flatMap(
+        (relation) => {
+          const requirement = relation.requerimiento_laboral;
+          return requirement?.id && requirement.titulo
+            ? [{ id: requirement.id, nombre: requirement.titulo }]
+            : [];
+        },
+      ),
     };
   }
 
-  // Adaptador temporal de TEXT[]; HU2 definirá el contrato final de requisitos.
-  private mapRequirements(relations: VacanteRequerimientoRow[] | null) {
-    return (relations ?? [])
-      .map((relation) =>
-        this.firstRelation(relation.requerimiento_laboral),
-      )
-      .filter((requirement): requirement is RequerimientoRow =>
-        Boolean(requirement?.id && requirement.titulo),
-      )
-      .map((requirement) => ({
-        id: requirement.id,
-        nombre: requirement.titulo ?? '',
-      }));
-  }
-
-  private normalizeRequirements(requirements: string[]) {
+  private normalizeRequirements(requirements: string[]): string[] {
+    if (!Array.isArray(requirements) || requirements.length === 0) {
+      throw new BadRequestException(
+        'Debe proporcionar al menos un requisito.',
+      );
+    }
     const normalized = requirements.map((requirement) => requirement.trim());
-    const unique = new Set(normalized.map((requirement) => requirement.toLowerCase()));
-
     if (normalized.some((requirement) => !requirement)) {
       throw new BadRequestException(
         'Los requisitos no pueden contener valores vacíos.',
       );
     }
 
-    if (unique.size !== normalized.length) {
-      throw new BadRequestException(
-        'Los requisitos no pueden estar duplicados.',
-      );
+    const canonicalNames = normalized.map((requirement) =>
+      this.canonicalName(requirement),
+    );
+    if (new Set(canonicalNames).size !== normalized.length) {
+      throw new BadRequestException('Los requisitos no pueden estar duplicados.');
     }
-
     return normalized;
   }
 
-  private handleWriteError(
-    error: SupabaseErrorLike,
-    fallbackMessage: string,
-  ): never {
-    const message = error.message ?? '';
-
-    if (message.includes('REQUISITO_DUPLICADO')) {
-      throw new BadRequestException(
-        'Uno o más requisitos ya están asociados a la vacante.',
-      );
-    }
-
-    if (
-      error.code === '23503' ||
-      message.includes('EMPRESA_NO_EXISTE') ||
-      message.includes('VACANTE_NO_EXISTE')
-    ) {
-      throw new BadRequestException(
-        message.includes('VACANTE_NO_EXISTE')
-          ? 'La vacante indicada no existe.'
-          : 'La empresa indicada no existe.',
-      );
-    }
-
-    if (
-      error.code === '22023' ||
-      message.includes('REQUISITO_INVALIDO') ||
-      message.includes('REQUISITOS_VACIOS')
-    ) {
-      throw new BadRequestException('Los requisitos indicados no son válidos.');
-    }
-
-    throw new InternalServerErrorException(fallbackMessage);
-  }
-
-  private obtenerValor(
-    fila: FilaVacante,
-    nombres: string[],
-  ): any {
-    for (const nombre of nombres) {
-      if (
-        Object.prototype.hasOwnProperty.call(fila, nombre) &&
-        fila[nombre] !== undefined
-      ) {
-        return fila[nombre];
-      }
-    }
-
-    return undefined;
-  }
-
-  private estaDisponible(vacante: FilaVacante): boolean {
-    const estado = this.obtenerValor(vacante, [
-      'estado',
-      'estado_vacante',
-      'status',
-      'estado_publicacion',
-    ]);
-
-    const estadoNormalizado = String(estado ?? '')
-      .trim()
-      .toLowerCase()
+  private canonicalName(value: string) {
+    return value
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-
-    const estadosPublicados = [
-      'publicada',
-      'publicado',
-      'publicada y vigente',
-      'vigente',
-      'abierta',
-      'activo',
-      'activa',
-      'published',
-      'open',
-      'disponible',
-    ];
-
-    if (!estadosPublicados.includes(estadoNormalizado)) {
-      return false;
-    }
-
-    const fechaLimite = this.obtenerValor(vacante, [
-      'fecha_limite',
-      'fecha_cierre',
-      'fecha_fin',
-      'fecha_vencimiento',
-      'fecha_limite_postulacion',
-    ]);
-
-    if (fechaLimite) {
-      const fecha = new Date(fechaLimite);
-
-      if (Number.isNaN(fecha.getTime())) {
-        return false;
-      }
-
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-
-      if (fecha < hoy) {
-        return false;
-      }
-    }
-
-    return true;
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase();
   }
 
-  async consultarDisponibilidad(buscar?: string) {
-    const { data, error } = await this.adminDb
-      .from('vacante')
-      .select('*');
-
-    if (error) {
-      console.error(
-        'Error consultando vacantes:',
-        error.message,
-      );
-
-      throw new InternalServerErrorException(
-        'No se pudieron consultar las vacantes disponibles.',
-      );
-    }
-
-    let vacantes = ((data ?? []) as FilaVacante[])
-      .filter((vacante) => this.estaDisponible(vacante));
-
-    if (buscar?.trim()) {
-      const termino = buscar.trim().toLowerCase();
-
-      vacantes = vacantes.filter((vacante) =>
-        Object.values(vacante).some(
-          (valor) =>
-            typeof valor === 'string' &&
-            valor.toLowerCase().includes(termino),
-        ),
-      );
-    }
-
-    return {
-      total: vacantes.length,
-      vacantes,
-    };
-  }
-  async crear(dto: CreateVacanteDto) {
-    const requisitos = this.normalizeRequirements(dto.requisitos);
-    const { data, error } = await this.db.rpc(
-      'crear_vacante_con_requisitos',
-      {
-        p_id_empresa: dto.idEmpresa,
-        p_titulo: dto.titulo.trim(),
-        p_modalidad: dto.modalidad.trim(),
-        p_descripcion: dto.descripcion.trim(),
-        p_ubicacion: dto.ubicacion.trim(),
-        p_area: dto.area.trim(),
-        p_condiciones: dto.condiciones.trim(),
-        p_requisitos: requisitos,
-      },
-    );
-
-    if (error) {
-      this.handleWriteError(error, 'No se pudo guardar la vacante.');
-    }
-
-    if (typeof data !== 'string') {
-      throw new InternalServerErrorException(
-        'No se pudo confirmar el identificador de la vacante guardada.',
-      );
-    }
-
-    return this.obtenerPorId(data);
-  }
-
-  async obtenerPorId(id: string) {
-    const { data, error } = await this.db
-      .from('vacante')
-      .select(VACANTE_SELECT)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      throw new InternalServerErrorException(
-        'No se pudo consultar la vacante.',
-      );
-    }
-
-    if (!data) {
-      throw new NotFoundException('La vacante no existe.');
-    }
-
-    return this.mapVacante(data as unknown as VacanteRow);
-  }
-
-  async actualizar(id: string, dto: UpdateVacanteDto) {
-    const cambios: Partial<
-      Pick<UpdateVacanteDto, 'titulo' | 'estado' | 'descripcion'>
-    > = {};
-
-    if (dto.titulo !== undefined) cambios.titulo = dto.titulo.trim();
-    if (dto.estado !== undefined) cambios.estado = dto.estado.trim();
-    if (dto.descripcion !== undefined) {
-      cambios.descripcion = dto.descripcion.trim();
-    }
-
-    if (Object.keys(cambios).length === 0) {
-      throw new BadRequestException(
-        'Debes indicar al menos un campo para actualizar.',
-      );
-    }
-
-    const { data, error } = await this.db
-      .from('vacante')
-      .update(cambios)
-      .eq('id', id)
-      .select(VACANTE_SELECT)
-      .maybeSingle();
-
-    if (error) {
-      throw new InternalServerErrorException(
-        'No se pudo actualizar la vacante.',
-      );
-    }
-
-    if (!data) {
-      throw new NotFoundException('La vacante no existe.');
-    }
-
-    return this.mapVacante(data as unknown as VacanteRow);
-  }
-
-  async listarPorEmpresa(idEmpresa: string) {
-    const { data, error } = await this.db
-      .from('vacante')
-      .select(VACANTE_SELECT)
-      .eq('id_empresa', idEmpresa)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new InternalServerErrorException(
-        'No se pudieron consultar las vacantes.',
-      );
-    }
-
-    return ((data ?? []) as unknown as VacanteRow[]).map((row) =>
-      this.mapVacante(row),
-    );
-  }
-
-  async agregarRequisitos(idVacante: string, requirements: string[]) {
-    const requisitos = this.normalizeRequirements(requirements);
-    const { error } = await this.db.rpc('agregar_requisitos_vacante', {
-      p_id_vacante: idVacante,
-      p_requisitos: requisitos,
-    });
-
-    if (error) {
-      this.handleWriteError(
-        error,
-        'No se pudieron asociar los requisitos a la vacante.',
-      );
-    }
-
-    return this.obtenerPorId(idVacante);
+  private estaDisponible(vacancy: VacanteWithRelations): boolean {
+    const estado = (vacancy.estado ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLocaleLowerCase();
+    if (!AVAILABLE_STATES.has(estado)) {return false;}
+    return !vacancy.fecha_cierre || vacancy.fecha_cierre >= new Date();
   }
 }

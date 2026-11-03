@@ -1,36 +1,33 @@
 import { Module } from '@nestjs/common';
-import { RequisitosTecnicosService } from './requisitos-tecnicos.service';
 import { ConfigModule } from '@nestjs/config';
-import { SupabaseModule } from '../../config/supabase.module';
+import { PrismaModule } from '../../shared/infrastructure/database/prisma.module';
 import { ElasticsearchService } from './indexacion/elasticsearch.service';
 import { VacantesIndexService } from './indexacion/vacantes-index.service';
+import { PrismaRequisitosTecnicosRepository } from './prisma-requisitos-tecnicos.repository';
+import { RequisitosTecnicosService } from './requisitos-tecnicos.service';
+import { REQUISITOS_TECNICOS_REPOSITORY } from './requisitos-tecnicos.repository';
 import { VacantesController } from './vacantes.controller';
 import { VacantesEstructuraService } from './vacantes-estructura.service';
 import { VacantesService } from './vacantes.service';
-import { REQUISITOS_TECNICOS_REPOSITORY } from './requisitos-tecnicos.repository';
-import { SupabaseRequisitosTecnicosRepository } from './supabase-requisitos-tecnicos.repository';
 
 @Module({
-  imports: [
-    ConfigModule,
-    SupabaseModule,
-  ],
+  imports: [ConfigModule, PrismaModule],
   controllers: [VacantesController],
   providers: [
+    VacantesService,
+    VacantesEstructuraService,
     RequisitosTecnicosService,
     {
       provide: REQUISITOS_TECNICOS_REPOSITORY,
-      useClass: SupabaseRequisitosTecnicosRepository,
+      useClass: PrismaRequisitosTecnicosRepository,
     },
-    VacantesEstructuraService,
-    VacantesService,
     ElasticsearchService,
     VacantesIndexService,
   ],
   exports: [
+    VacantesService,
     VacantesEstructuraService,
     RequisitosTecnicosService,
-    VacantesService,
   ],
 })
 export class VacantesModule {}

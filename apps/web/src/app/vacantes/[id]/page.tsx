@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import DetalleVacanteCliente from './DetalleVacanteCliente';
 
-export const instant = false;
-
 export const metadata: Metadata = {
   title: 'Detalle de vacante | UMSSPIRA',
 };

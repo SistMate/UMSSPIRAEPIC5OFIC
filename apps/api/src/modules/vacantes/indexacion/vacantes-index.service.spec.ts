@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { Client } from '@elastic/elasticsearch';
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -59,7 +58,7 @@ class FakeElasticsearchClient {
       id: string;
       document: VacancyIndexDocument;
     }) => {
-      if (this.failIndexing) throw new Error('cluster privado');
+      if (this.failIndexing) {throw new Error('cluster privado');}
       this.indexRequests.push(request);
       this.documents.set(`${request.index}/${request.id}`, request.document);
       return { result: 'created' };
@@ -82,7 +81,7 @@ class FakeElasticsearchClient {
       : documents.filter((document) => {
           const clauses = query.bool?.should ?? [];
           return clauses.some((clause) => {
-            if (clause.term) return document.id === clause.term.id;
+            if (clause.term) {return document.id === clause.term.id;}
             const titleQuery = clause.match?.titulo.query.toLowerCase();
             return titleQuery
               ? document.titulo.toLowerCase().includes(titleQuery)

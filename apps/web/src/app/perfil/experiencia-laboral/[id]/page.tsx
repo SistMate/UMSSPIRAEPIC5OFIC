@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   title: "Detalle de experiencia laboral | UMSSPIRA",
 };
 
-export const instant = false;
-
 export default async function WorkExperienceDetailPage({
   params,
 }: {

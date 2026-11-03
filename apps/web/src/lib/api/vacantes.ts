@@ -1,3 +1,6 @@
+import { apiUrl } from '../../shared/services/api-contract';
+import { authenticatedFetch } from '../../shared/services/auth-session';
+
 export type VacancyRequirement = {
   id: string;
   nombre: string;
@@ -19,7 +22,7 @@ export type Vacancy = {
 };
 
 export type CreateVacancyInput = {
-  idEmpresa: string;
+  idEmpresa?: string;
   titulo: string;
   modalidad: string;
   descripcion: string;
@@ -43,26 +46,11 @@ type ApiErrorBody = {
   message?: string | string[];
 };
 
-export const DEFAULT_API_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://backend-umsspira.vercel.app'
-    : 'http://localhost:3000';
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
-).replace(/\/$/, '');
-
-export const configuredCompanyId =
-  process.env.NEXT_PUBLIC_EMPRESA_ID?.trim() || '';
-
-export const configuredCompanyName =
-  process.env.NEXT_PUBLIC_EMPRESA_NAME?.trim() || '';
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await authenticatedFetch(apiUrl(path), {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -102,18 +90,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function createVacancy(input: CreateVacancyInput) {
-  return request<Vacancy>('/vacantes', {
+  return request<Vacancy>('/api/v1/vacantes', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
 export function getVacancy(id: string) {
-  return request<Vacancy>(`/vacantes/${encodeURIComponent(id)}`);
+  return request<Vacancy>(`/api/v1/vacantes/${encodeURIComponent(id)}`);
 }
 
 export function updateVacancy(id: string, input: UpdateVacancyInput) {
-  return request<Vacancy>(`/vacantes/${encodeURIComponent(id)}`, {
+  return request<Vacancy>(`/api/v1/vacantes/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
@@ -121,26 +109,25 @@ export function updateVacancy(id: string, input: UpdateVacancyInput) {
 
 export function indexVacancy(id: string) {
   return request<IndexVacancyResponse>(
-    `/vacantes/${encodeURIComponent(id)}/indexar`,
+    `/api/v1/vacantes/${encodeURIComponent(id)}/indexar`,
     { method: 'POST' },
   );
 }
 
 export function searchIndexedVacancies(query: string, signal?: AbortSignal) {
   const search = new URLSearchParams({ q: query.trim() });
-  return request<Vacancy[]>(`/vacantes/buscar?${search.toString()}`, {
+  return request<Vacancy[]>(`/api/v1/vacantes/buscar?${search.toString()}`, {
     signal,
   });
 }
 
-export function listVacancies(idEmpresa: string) {
-  const query = new URLSearchParams({ idEmpresa });
-  return request<Vacancy[]>(`/vacantes?${query.toString()}`);
+export function listVacancies() {
+  return request<Vacancy[]>('/api/v1/vacantes/mis-vacantes');
 }
 
 export function isVacancyAvailable(status: string) {
-  // Mapeo provisional para HU3; Equipo 4 definirá el catálogo oficial.
-  return status.trim().toLowerCase() === 'disponible';
+  return ['publicada', 'publicado', 'publicada y vigente', 'vigente', 'abierta', 'activo', 'activa', 'published', 'open', 'disponible']
+    .includes(status.trim().toLocaleLowerCase());
 }
 
 export function getVacancyIdentifier(vacancy: Pick<Vacancy, 'id'>) {

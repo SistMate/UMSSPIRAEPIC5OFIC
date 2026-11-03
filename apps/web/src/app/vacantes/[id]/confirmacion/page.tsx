@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   title: 'Vacante guardada | UMSSPIRA',
 };
 
-export const instant = false;
-
 export default async function ConfirmacionVacantePage({
   params,
 }: {

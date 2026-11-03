@@ -4,7 +4,8 @@ import type {
   ValidateVacancyStructureResponse,
 } from "./contracts";
 
-export const VACANCY_STRUCTURE_VALIDATION_PATH = "/vacantes/estructura/validar";
+export const VACANCY_STRUCTURE_VALIDATION_PATH =
+  "/api/v1/vacantes/estructura/validar";
 
 type Fetcher = (
   input: RequestInfo | URL,
