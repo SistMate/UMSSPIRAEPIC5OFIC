@@ -13,6 +13,18 @@ import {
   JobPostingsSearchOptions,
 } from './job-postings-search.types';
 
+type ElasticsearchSearchResponse = {
+  hits?: {
+    hits?: Array<{
+      _id?: string;
+      _source?: Partial<IndexedJobPosting>;
+    }>;
+    total?: number | {
+      value: number;
+    };
+  };
+};
+
 @Injectable()
 export class JobPostingsSearchService {
   private readonly logger = new Logger(
@@ -120,7 +132,9 @@ export class JobPostingsSearchService {
         );
       }
 
-      const result = await response.json() as any;
+      const result =
+        (await response.json()) as ElasticsearchSearchResponse;
+
       const hits = result.hits?.hits ?? [];
 
       const uniqueVacancies = new Map<string, IndexedJobPosting>();
