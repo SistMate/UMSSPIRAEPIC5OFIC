@@ -6,3 +6,4 @@ export type PingResponse = {
 
 export * from './company';
 export * from './job-posting';
+export * from './events';
