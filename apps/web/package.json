@@ -2,37 +2,43 @@
   "name": "web",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "jest --passWithNoTests",
+    "start": "next start -p 3001",
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test src/lib/vacancies/client.spec.mts src/lib/vacancies/technical-requirements-client.spec.mts src/lib/api/vacantes.spec.mts src/lib/vacancies/vacancy-editing.spec.mts",
+    "test:jest": "jest --passWithNoTests",
     "test:watch": "jest --watch"
   },
   "dependencies": {
     "@umsspira/shared-types": "workspace:*",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.378.0",
-    "next": "14.2.3",
-    "react": "^18",
-    "react-dom": "^18",
-    "tailwind-merge": "^2.3.0"
+    "lucide-react": "^1.55.0",
+    "next": "16.4.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@tailwindcss/turbopack": "^4.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.6.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.3",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.4.3",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "postcss": "^8.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.0.0"
   }
 }
