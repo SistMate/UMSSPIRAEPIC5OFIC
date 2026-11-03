@@ -206,14 +206,14 @@ export class FormacionAcademicaService {
 
     const cambios: Record<string, unknown> = {};
 
-    if (dto.idEgresado !== undefined) cambios.id_egresado = dto.idEgresado;
-    if (dto.idCarrera !== undefined) cambios.id_carrera = dto.idCarrera;
-    if (dto.tipoFormacion !== undefined) cambios.tipo_formacion = dto.tipoFormacion;
-    if (dto.institucion !== undefined) cambios.institucion = dto.institucion.trim();
-    if (dto.titulo !== undefined) cambios.titulo = dto.titulo.trim();
-    if (dto.nivelAcademico !== undefined) cambios.nivel_academico = dto.nivelAcademico;
-    if (dto.estado !== undefined) cambios.estado = dto.estado;
-    if (dto.anioInicio !== undefined) cambios.anio_inicio = dto.anioInicio;
+    if (dto.idEgresado !== undefined) {cambios.id_egresado = dto.idEgresado;}
+    if (dto.idCarrera !== undefined) {cambios.id_carrera = dto.idCarrera;}
+    if (dto.tipoFormacion !== undefined) {cambios.tipo_formacion = dto.tipoFormacion;}
+    if (dto.institucion !== undefined) {cambios.institucion = dto.institucion.trim();}
+    if (dto.titulo !== undefined) {cambios.titulo = dto.titulo.trim();}
+    if (dto.nivelAcademico !== undefined) {cambios.nivel_academico = dto.nivelAcademico;}
+    if (dto.estado !== undefined) {cambios.estado = dto.estado;}
+    if (dto.anioInicio !== undefined) {cambios.anio_inicio = dto.anioInicio;}
 
     if (dto.anioFin !== undefined) {
       cambios.anio_fin = dto.anioFin;

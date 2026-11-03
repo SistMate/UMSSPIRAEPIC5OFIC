@@ -99,8 +99,8 @@ export class SupabaseRequisitosTecnicosRepository
     const update: Partial<
       Pick<RequisitoTecnicoRow, 'nivel' | 'tipo' | 'descripcion'>
     > = {};
-    if (cambios.nivel !== undefined) update.nivel = cambios.nivel;
-    if (cambios.tipo !== undefined) update.tipo = cambios.tipo;
+    if (cambios.nivel !== undefined) {update.nivel = cambios.nivel;}
+    if (cambios.tipo !== undefined) {update.tipo = cambios.tipo;}
     if (cambios.descripcion !== undefined) {
       update.descripcion = cambios.descripcion.trim() || null;
     }

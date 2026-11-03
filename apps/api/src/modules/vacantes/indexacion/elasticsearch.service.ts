@@ -100,7 +100,7 @@ export class ElasticsearchService {
   }
 
   private getClient() {
-    if (this.client) return this.client;
+    if (this.client) {return this.client;}
 
     const node = this.configService
       .get<string>('ELASTICSEARCH_NODE')
@@ -125,7 +125,7 @@ export class ElasticsearchService {
   }
 
   private throwControlledError(error: unknown): never {
-    if (error instanceof ServiceUnavailableException) throw error;
+    if (error instanceof ServiceUnavailableException) {throw error;}
 
     throw new ServiceUnavailableException(
       'El servicio de búsqueda no está disponible temporalmente.',

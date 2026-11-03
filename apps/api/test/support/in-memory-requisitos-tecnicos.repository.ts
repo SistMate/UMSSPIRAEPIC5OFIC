@@ -32,10 +32,10 @@ export class InMemoryRequisitosTecnicosRepository
         requirement.idVacante === idVacante &&
         requirement.id === idRequisito,
     );
-    if (!item) return null;
+    if (!item) {return null;}
 
-    if (cambios.nivel !== undefined) item.nivel = cambios.nivel;
-    if (cambios.tipo !== undefined) item.tipo = cambios.tipo;
+    if (cambios.nivel !== undefined) {item.nivel = cambios.nivel;}
+    if (cambios.tipo !== undefined) {item.tipo = cambios.tipo;}
     if (cambios.descripcion !== undefined) {
       item.descripcion = cambios.descripcion.trim() || undefined;
     }
@@ -50,7 +50,7 @@ export class InMemoryRequisitosTecnicosRepository
     const index = this.requirements.findIndex(
       (item) => item.idVacante === idVacante && item.id === idRequisito,
     );
-    if (index < 0) return false;
+    if (index < 0) {return false;}
     this.requirements.splice(index, 1);
     return true;
   }
