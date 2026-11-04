@@ -1,18 +1,13 @@
+
 import { Module } from '@nestjs/common';
 
-import { JobPostingsController } from './job-postings.controller';
-import { JobPostingsService } from './job-postings.service';
-import { JobPostingsSearchService } from './search/job-postings-search.service';
+import { PrismaModule } from '../../shared/infrastructure/database/prisma.module';
+import { jobPostingsProviders } from './infrastructure/providers/job-postings.providers';
+import { CreateJobPostingController } from './http/controllers/create-job-posting.controller';
 
 @Module({
-  controllers: [JobPostingsController],
-  providers: [
-    JobPostingsService,
-    JobPostingsSearchService,
-  ],
-  exports: [
-    JobPostingsService,
-    JobPostingsSearchService,
-  ],
+  imports: [PrismaModule],
+  controllers: [CreateJobPostingController],
+  providers: jobPostingsProviders,
 })
 export class JobPostingsModule {}
