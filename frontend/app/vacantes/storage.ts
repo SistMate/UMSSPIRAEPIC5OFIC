@@ -1,4 +1,3 @@
-import { SKILLS_STORAGE_KEY } from './comparison-data';
 import {
   VACANCIES_CHANGED_EVENT,
   VACANCIES_STORAGE_KEY,
@@ -19,17 +18,6 @@ export function subscribeToLocalStorage(onChange: () => void) {
 export function readVacancySnapshot(): string | null {
   try {
     return localStorage.getItem(VACANCIES_STORAGE_KEY);
-  } catch {
-    return STORAGE_READ_ERROR_SNAPSHOT;
-  }
-}
-
-export function readComparisonSnapshot(): string {
-  try {
-    return JSON.stringify([
-      localStorage.getItem(VACANCIES_STORAGE_KEY),
-      localStorage.getItem(SKILLS_STORAGE_KEY),
-    ]);
   } catch {
     return STORAGE_READ_ERROR_SNAPSHOT;
   }
