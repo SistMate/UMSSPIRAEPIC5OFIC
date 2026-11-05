@@ -10,42 +10,65 @@ import {
   listVacancies,
   type Vacancy,
 } from '../../lib/api/vacantes';
+import { readSavedVacancies } from '../vacantes/vacancy-data';
+import { mapLocalVacancy } from '../vacantes/vacancy-adapter';
 import VacancyAdminFooter from '../vacantes/components/VacancyAdminFooter';
+
+const hasBackendCompany =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    configuredCompanyId,
+  );
 
 export default function MisVacantesCliente() {
   const searchParams = useSearchParams();
   const savedId = searchParams.get('guardada');
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
-  const [loading, setLoading] = useState(Boolean(configuredCompanyId));
-  const [error, setError] = useState(
-    configuredCompanyId
-      ? ''
-      : 'No se configuró la empresa cuyas vacantes deben consultarse.',
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
 
   useEffect(() => {
     let active = true;
 
-    if (!configuredCompanyId) {
-      return;
-    }
+    void Promise.allSettled([
+      hasBackendCompany
+        ? listVacancies(configuredCompanyId)
+        : Promise.resolve([] as Vacancy[]),
+      Promise.resolve().then(() => readSavedVacancies().map(mapLocalVacancy)),
+    ]).then(([remoteResult, localResult]) => {
+      if (!active) return;
 
-    listVacancies(configuredCompanyId)
-      .then((data) => {
-        if (active) setVacancies(data);
-      })
-      .catch((requestError: unknown) => {
-        if (active) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'No se pudieron consultar las vacantes.',
+      const remote =
+        remoteResult.status === 'fulfilled' ? remoteResult.value : [];
+      const local = localResult.status === 'fulfilled' ? localResult.value : [];
+      const combined = new Map<string, Vacancy>();
+      [...remote, ...local].forEach((vacancy) =>
+        combined.set(vacancy.id, vacancy),
+      );
+      setVacancies(Array.from(combined.values()));
+
+      if (remoteResult.status === 'rejected' && hasBackendCompany) {
+        const remoteError =
+          remoteResult.reason instanceof Error
+            ? remoteResult.reason.message
+            : 'No se pudieron consultar las vacantes de la empresa.';
+        if (local.length === 0) {
+          setError(remoteError);
+        } else {
+          setWarning(
+            `No se pudieron consultar las vacantes de la empresa: ${remoteError}`,
           );
         }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      } else if (localResult.status === 'rejected') {
+        if (remote.length === 0) {
+          setError('No se pudieron leer las vacantes guardadas en este navegador.');
+        } else {
+          setWarning('No se pudieron leer las vacantes guardadas en este navegador.');
+        }
+      }
+
+      setLoading(false);
+    });
 
     return () => {
       active = false;
@@ -88,6 +111,15 @@ export default function MisVacantesCliente() {
               </p>
             </div>
           </section>
+        )}
+
+        {warning && (
+          <p
+            role="status"
+            className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            {warning}
+          </p>
         )}
 
         <section className={`${savedId ? 'mt-4' : 'mt-14'} rounded-2xl border border-[#ddd6c8] bg-white p-5 sm:p-7`}>

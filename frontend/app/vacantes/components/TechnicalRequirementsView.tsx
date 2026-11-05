@@ -252,7 +252,7 @@ export default function TechnicalRequirementsView({
       message: 'Todos los requisitos técnicos fueron guardados exitosamente.',
     });
     setTimeout(() => {
-      router.push('/vacantes');
+      router.push(`/mis-vacantes?guardada=${encodeURIComponent(vacancyId)}`);
     }, 1200);
   };
 

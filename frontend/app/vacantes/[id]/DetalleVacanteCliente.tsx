@@ -6,25 +6,36 @@ import {
   ArrowLeft,
   BriefcaseBusiness,
   Building2,
-  CheckCircle2,
   Clock3,
   MapPin,
   ArrowRight,
   Send,
 } from 'lucide-react';
 import PortalFooter from '../../components/PortalFooter';
+import { AffinityScore } from '../components/AffinityScore';
 import {
   getVacancy,
   getVacancyIdentifier,
   isVacancyAvailable,
   type Vacancy,
 } from '../../../lib/api/vacantes';
-import {
-  findVacancy as findLocalVacancy,
-  type Vacancy as LocalVacancy,
-} from '../vacancy-data';
+import { calculateLocalAffinity } from '../../../lib/vacancies/local-affinity';
+import type { Skill } from '../../skills/data';
+import { readProfileSkills } from '../comparison-data';
+import { findVacancy as findLocalVacancy } from '../vacancy-data';
+import { mapLocalVacancy } from '../vacancy-adapter';
 
 type Props = { id: string };
+
+type VacancyLoadState =
+  | { id: string; retryCount: number; status: 'loading' }
+  | { id: string; retryCount: number; status: 'error'; message: string }
+  | {
+      id: string;
+      retryCount: number;
+      status: 'ready';
+      vacancy: Vacancy;
+    };
 
 function getPublicationDate(createdAt: string | null) {
   if (!createdAt) return 'No especificada';
@@ -38,30 +49,25 @@ function getPublicationDate(createdAt: string | null) {
       });
 }
 
-function mapLocalVacancy(vacancy: LocalVacancy): Vacancy {
-  return {
-    id: String(vacancy.id),
-    idEmpresa: 'local',
-    empresa: vacancy.company,
-    titulo: vacancy.title,
-    modalidad: vacancy.modality,
-    estado: vacancy.availability === 'unavailable' ? 'No disponible' : 'Disponible',
-    fechaCreacion: vacancy.createdAt ?? null,
-    descripcion: vacancy.description,
-    ubicacion: vacancy.location,
-    area: vacancy.area,
-    condiciones: vacancy.conditions ?? '',
-    requisitos: vacancy.requirements.map((nombre, index) => ({
-      id: `${vacancy.id}-requisito-${index}`,
-      nombre,
-    })),
-  };
-}
-
 export default function DetalleVacanteCliente({ id }: Props) {
-  const [vacancy, setVacancy] = useState<Vacancy | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [vacancyLoadState, setVacancyLoadState] = useState<VacancyLoadState>({
+    id,
+    retryCount: 0,
+    status: 'loading',
+  });
+  const [profileSkills, setProfileSkills] = useState<Skill[]>([]);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const currentLoadState =
+    vacancyLoadState.id === id && vacancyLoadState.retryCount === retryCount
+      ? vacancyLoadState
+      : { id, retryCount, status: 'loading' as const };
+  const loading = currentLoadState.status === 'loading';
+  const error =
+    currentLoadState.status === 'error' ? currentLoadState.message : '';
+  const vacancy =
+    currentLoadState.status === 'ready' ? currentLoadState.vacancy : null;
 
   useEffect(() => {
     let active = true;
@@ -70,38 +76,82 @@ export default function DetalleVacanteCliente({ id }: Props) {
       try {
         const localVacancy = findLocalVacancy(id);
         if (localVacancy) {
-          if (active) setVacancy(mapLocalVacancy(localVacancy));
+          if (active) {
+            setVacancyLoadState({
+              id,
+              retryCount,
+              status: 'ready',
+              vacancy: mapLocalVacancy(localVacancy),
+            });
+          }
           return;
         }
       } catch {
         if (active) {
-          setError('No se pudieron leer las vacantes guardadas en este navegador.');
+          setVacancyLoadState({
+            id,
+            retryCount,
+            status: 'error',
+            message: 'No se pudieron leer las vacantes guardadas en este navegador.',
+          });
         }
         return;
       }
 
       try {
         const result = await getVacancy(id);
-        if (active) setVacancy(result);
+        if (active) {
+          setVacancyLoadState({
+            id,
+            retryCount,
+            status: 'ready',
+            vacancy: result,
+          });
+        }
       } catch (requestError: unknown) {
         if (!active) return;
-        setVacancy(null);
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'No se pudo cargar la vacante.',
-        );
+        setVacancyLoadState({
+          id,
+          retryCount,
+          status: 'error',
+          message:
+            requestError instanceof Error
+              ? requestError.message
+              : 'No se pudo cargar la vacante.',
+        });
       }
     };
 
-    void loadVacancy().finally(() => {
-      if (active) setLoading(false);
-    });
+    void loadVacancy();
 
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, retryCount]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve()
+      .then(() => readProfileSkills())
+      .then((skills) => {
+        if (!active) return;
+        setProfileSkills(skills);
+        setProfileError('');
+        setProfileLoaded(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProfileSkills([]);
+        setProfileError(
+          'No se pudieron leer las habilidades guardadas en este navegador.',
+        );
+        setProfileLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -143,9 +193,16 @@ export default function DetalleVacanteCliente({ id }: Props) {
             <p className="mt-2 text-sm text-[#617184]">
               {error || 'La vacante no existe o ya no está disponible.'}
             </p>
+            <button
+              type="button"
+              onClick={() => setRetryCount((count) => count + 1)}
+              className="mt-5 min-h-10 rounded-md bg-[#ffb162] px-4 text-sm font-semibold text-[#142237] hover:bg-[#f6a34f]"
+            >
+              Reintentar
+            </button>
             <Link
               href="/vacantes"
-              className="mt-6 inline-flex items-center gap-2 rounded-md bg-[#ffb162] px-4 py-3 text-sm font-semibold text-[#142237] hover:bg-[#f6a34f]"
+              className="mt-5 ml-3 inline-flex items-center gap-2 rounded-md border border-[#d9d0c3] bg-white px-4 py-3 text-sm font-semibold text-[#142237] hover:bg-[#fcfaf6]"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               Volver a vacantes
@@ -159,6 +216,10 @@ export default function DetalleVacanteCliente({ id }: Props) {
 
   const identifier = getVacancyIdentifier(vacancy);
   const available = isVacancyAvailable(vacancy.estado);
+  const affinity = calculateLocalAffinity(
+    vacancy.requisitos.map((requirement) => requirement.nombre),
+    profileSkills,
+  );
 
   return (
     <div className="flex min-h-[calc(100vh-84px)] flex-col bg-[#f5f2ec]">
@@ -176,13 +237,13 @@ export default function DetalleVacanteCliente({ id }: Props) {
           </span>
         </nav>
 
-        {vacancy.idEmpresa === 'local' && (
+        {!available && (
           <p
             role="status"
-            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+            className="mb-4 rounded-md border border-[#e6c6ba] bg-white px-4 py-3 text-xs text-[#8a4b27]"
           >
-            Vista previa guardada en este navegador. Esta vacante no se publicó
-            en el backend.
+            Esta vacante ya no está disponible para postular ni consultar su
+            afinidad.
           </p>
         )}
 
@@ -262,6 +323,43 @@ export default function DetalleVacanteCliente({ id }: Props) {
 
           <aside className="space-y-4">
             <section className="rounded-lg border border-[#d9d0c3] bg-white p-5 sm:p-6">
+                {profileLoaded ? (
+                  profileError ? (
+                    <p role="alert" className="text-sm text-[#a33f31]">
+                      {profileError}
+                    </p>
+                  ) : (
+                    <AffinityScore
+                      percentage={
+                        profileSkills.length > 0
+                          ? affinity.percentage
+                          : null
+                      }
+                      matched={affinity.matched}
+                      total={affinity.total}
+                      emptyMessage={
+                        profileSkills.length === 0
+                          ? 'No hay habilidades guardadas en este navegador.'
+                          : 'Esta vacante no tiene requisitos registrados.'
+                      }
+                    />
+                  )
+                ) : (
+                  <p role="status" className="text-sm text-[#617184]">
+                    Cargando habilidades guardadas…
+                  </p>
+                )}
+                {available && (
+                  <Link
+                    href={`/vacantes/${encodeURIComponent(vacancy.id)}/afinidad`}
+                    className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#ffb162] px-4 text-xs font-semibold text-[#142237] hover:bg-[#f6a34f]"
+                  >
+                    Consultar resultado de afinidad
+                    <ArrowRight size={13} aria-hidden="true" />
+                  </Link>
+                )}
+            </section>
+            <section className="rounded-lg border border-[#d9d0c3] bg-white p-5 sm:p-6">
               <h2 className="text-base font-bold text-[#142237]">
                 Información de la oferta
               </h2>
@@ -291,7 +389,7 @@ export default function DetalleVacanteCliente({ id }: Props) {
                 </div>
               </dl>
               <div className="mt-4 space-y-2 border-t border-[#e7dfd3] pt-4">
-                {available && (
+                {available && vacancy.idEmpresa !== 'local' && (
                   <Link
                     href={`/vacantes/${encodeURIComponent(vacancy.id)}/postular`}
                     className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#ffb162] px-4 text-xs font-semibold text-[#142237] hover:bg-[#f6a34f]"
@@ -300,14 +398,6 @@ export default function DetalleVacanteCliente({ id }: Props) {
                     Postular a la oferta
                   </Link>
                 )}
-                <Link
-                  href={`/vacantes/${encodeURIComponent(vacancy.id)}/comparar`}
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-[#d9d0c3] bg-white px-4 text-xs font-medium text-[#142237] hover:bg-[#fcfaf6]"
-                >
-                  <CheckCircle2 size={14} aria-hidden="true" />
-                  Comparar mis habilidades
-                  <ArrowRight size={13} aria-hidden="true" />
-                </Link>
                 <Link
                   href="/vacantes"
                   className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-[#d9d0c3] bg-white px-4 text-xs font-medium text-[#142237] hover:bg-[#fcfaf6]"
