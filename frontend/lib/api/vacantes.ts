@@ -1,3 +1,4 @@
+
 export type VacancyRequirement = {
   id: string;
   nombre: string;
@@ -16,6 +17,20 @@ export type Vacancy = {
   area: string;
   condiciones: string;
   requisitos: VacancyRequirement[];
+};
+
+export type VacancyAffinity = {
+  idVacante: string;
+  porcentaje: number | null;
+  cumplidos: number;
+  total: number;
+  requisitos: {
+    id: string;
+    area: string;
+    nivelRequerido: string;
+    nivelCandidato: string | null;
+    cumplido: boolean;
+  }[];
 };
 
 export type CreateVacancyInput = {
@@ -48,7 +63,10 @@ export const configuredCompanyId =
 export const configuredCompanyName =
   process.env.NEXT_PUBLIC_EMPRESA_NAME?.trim() || 'TecnoAndes S.R.L.';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   let response: Response;
 
   try {
@@ -99,19 +117,50 @@ export function createVacancy(input: CreateVacancyInput) {
 }
 
 export function getVacancy(id: string) {
-  return request<Vacancy>(`/vacantes/${encodeURIComponent(id)}`);
+  return request<Vacancy>(
+    `/vacantes/${encodeURIComponent(id)}`,
+  );
 }
 
-export function searchIndexedVacancies(query: string, signal?: AbortSignal) {
+export function searchIndexedVacancies(
+  query: string,
+  signal?: AbortSignal,
+) {
   const search = new URLSearchParams({ q: query.trim() });
-  return request<Vacancy[]>(`/vacantes/buscar?${search.toString()}`, {
-    signal,
-  });
+
+  return request<Vacancy[]>(
+    `/vacantes/buscar?${search.toString()}`,
+    { signal },
+  );
 }
 
 export function listVacancies(idEmpresa: string) {
   const query = new URLSearchParams({ idEmpresa });
-  return request<Vacancy[]>(`/vacantes?${query.toString()}`);
+
+  return request<Vacancy[]>(
+    `/vacantes?${query.toString()}`,
+  );
+}
+
+/**
+ * Consulta la afinidad real entre el egresado autenticado
+ * y una vacante específica.
+ */
+export function getVacancyAffinity(
+  id: string,
+  accessToken: string,
+  signal?: AbortSignal,
+) {
+  return request<VacancyAffinity>(
+    `/vacantes/${encodeURIComponent(id)}/afinidad`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      signal,
+    },
+  );
 }
 
 export function isVacancyAvailable(status: string) {
@@ -119,7 +168,9 @@ export function isVacancyAvailable(status: string) {
   return status.trim().toLowerCase() === 'disponible';
 }
 
-export function getVacancyIdentifier(vacancy: Pick<Vacancy, 'id'>) {
+export function getVacancyIdentifier(
+  vacancy: Pick<Vacancy, 'id'>,
+) {
   // HU1/HU2 sustituirán este adaptador cuando exista un código oficial.
   return vacancy.id;
 }
