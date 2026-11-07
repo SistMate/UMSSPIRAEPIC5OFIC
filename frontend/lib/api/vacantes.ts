@@ -21,13 +21,14 @@ export type Vacancy = {
 
 export type VacancyAffinity = {
   idVacante: string;
+  idEgresado?: string;
   porcentaje: number | null;
   cumplidos: number;
   total: number;
   requisitos: {
     id: string;
     area: string;
-    nivelRequerido: string;
+    nivelRequerido: string | null;
     nivelCandidato: string | null;
     cumplido: boolean;
   }[];
@@ -143,8 +144,7 @@ export function listVacancies(idEmpresa: string) {
 }
 
 /**
- * Consulta la afinidad real entre el egresado autenticado
- * y una vacante específica.
+ * Consulta la afinidad del egresado autenticado.
  */
 export function getVacancyAffinity(
   id: string,
@@ -158,6 +158,23 @@ export function getVacancyAffinity(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal,
+    },
+  );
+}
+
+/**
+ * Consulta la afinidad utilizando el egresado
+ * de prueba configurado temporalmente en el backend.
+ */
+export function getSimulatedVacancyAffinity(
+  id: string,
+  signal?: AbortSignal,
+) {
+  return request<VacancyAffinity>(
+    `/vacantes/${encodeURIComponent(id)}/afinidad/simulacion`,
+    {
+      method: 'GET',
       signal,
     },
   );
