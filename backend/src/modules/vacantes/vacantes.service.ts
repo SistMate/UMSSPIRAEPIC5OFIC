@@ -117,7 +117,9 @@ export class VacantesService {
 
   private normalizeRequirements(requirements: string[]) {
     const normalized = requirements.map((requirement) => requirement.trim());
-    const unique = new Set(normalized.map((requirement) => requirement.toLowerCase()));
+    const unique = new Set(
+      normalized.map((requirement) => requirement.toLowerCase()),
+    );
 
     if (normalized.some((requirement) => !requirement)) {
       throw new BadRequestException(
@@ -278,8 +280,10 @@ export class VacantesService {
       vacantes,
     };
   }
+
   async crear(dto: CreateVacanteDto) {
     const requisitos = this.normalizeRequirements(dto.requisitos);
+
     const { data, error } = await this.db.rpc(
       'crear_vacante_con_requisitos',
       {
@@ -345,8 +349,38 @@ export class VacantesService {
     );
   }
 
+  // Búsqueda directa en Supabase cuando no se dispone de Elasticsearch.
+  async buscarVacantes(buscar: string) {
+    const { data, error } = await this.adminDb
+      .from('vacante')
+      .select(VACANTE_SELECT)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error buscando vacantes:', error.message);
+
+      throw new InternalServerErrorException(
+        'No se pudieron consultar las vacantes.',
+      );
+    }
+
+    const termino = buscar.trim().toLowerCase();
+
+    return ((data ?? []) as unknown as VacanteRow[])
+      .map((row) => this.mapVacante(row))
+      .filter((vacante) => {
+        if (!termino) return true;
+
+        return (
+          vacante.titulo.toLowerCase().includes(termino) ||
+          vacante.id.toLowerCase() === termino
+        );
+      });
+  }
+
   async agregarRequisitos(idVacante: string, requirements: string[]) {
     const requisitos = this.normalizeRequirements(requirements);
+
     const { error } = await this.db.rpc('agregar_requisitos_vacante', {
       p_id_vacante: idVacante,
       p_requisitos: requisitos,
