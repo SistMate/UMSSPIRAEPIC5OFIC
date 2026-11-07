@@ -3,63 +3,102 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+
 import { SupabaseService } from '../../config/supabase.service';
 import { AuthenticatedUser } from '../experiencia-laboral/authenticated-user';
 
 const EGRESADO_PRUEBA_ID = 'ee9bf378-5daf-4724-ac0f-7a52d6bd005e';
 
-const NIVEL_VALOR: Record<string, number> = {
-  Básico: 1,
-  Intermedio: 2,
-  Avanzado: 3,
-};
+function normalizarNivel(
+  nivel: string | null | undefined,
+): number {
+  const valor = (nivel ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const niveles: Record<string, number> = {
+    basico: 1,
+    intermedio: 2,
+    avanzado: 3,
+  };
+
+  return niveles[valor] ?? 0;
+}
 
 @Injectable()
 export class AfinidadService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+  ) {}
 
-  // Cálculo para usuarios autenticados
-  async calcular(usuario: AuthenticatedUser, idVacante: string) {
-    return this.calcularPorEgresado(usuario.egresadoId, idVacante);
+  // Cálculo para usuarios autenticados.
+  async calcular(
+    usuario: AuthenticatedUser,
+    idVacante: string,
+  ) {
+    return this.calcularPorEgresado(
+      usuario.egresadoId,
+      idVacante,
+    );
   }
 
-  // Cálculo temporal para el egresado de prueba
+  // Cálculo temporal para el egresado de prueba.
   async calcularSimulacion(idVacante: string) {
-    return this.calcularPorEgresado(EGRESADO_PRUEBA_ID, idVacante);
+    return this.calcularPorEgresado(
+      EGRESADO_PRUEBA_ID,
+      idVacante,
+    );
   }
 
-  // Lógica compartida de cálculo de afinidad
+  // Lógica compartida de cálculo de afinidad.
   private async calcularPorEgresado(
     idEgresado: string,
     idVacante: string,
   ) {
     const db = this.supabaseService.getAdminClient();
 
-    const { data: habilidades, error: errorHabilidades } = await db
+    const {
+      data: habilidades,
+      error: errorHabilidades,
+    } = await db
       .from('habilidad_egresado')
       .select('id_area, nivel, anios_experiencia')
       .eq('id_egresado', idEgresado);
 
     if (errorHabilidades) {
-      throw new InternalServerErrorException(errorHabilidades.message);
+      throw new InternalServerErrorException(
+        errorHabilidades.message,
+      );
     }
 
-    const { data: relaciones, error: errorRelaciones } = await db
+    const {
+      data: relaciones,
+      error: errorRelaciones,
+    } = await db
       .from('vacante_requerimiento_laboral')
       .select('id_requerimiento_laboral')
       .eq('id_vacante', idVacante);
 
     if (errorRelaciones) {
-      throw new InternalServerErrorException(errorRelaciones.message);
+      throw new InternalServerErrorException(
+        errorRelaciones.message,
+      );
     }
 
     const idsRequerimientos = [
-      ...new Set((relaciones ?? []).map((r) => r.id_requerimiento_laboral)),
+      ...new Set(
+        (relaciones ?? []).map(
+          (relacion) => relacion.id_requerimiento_laboral,
+        ),
+      ),
     ];
 
     if (idsRequerimientos.length === 0) {
       return {
         idVacante,
+        idEgresado,
         porcentaje: null,
         cumplidos: 0,
         total: 0,
@@ -67,32 +106,48 @@ export class AfinidadService {
       };
     }
 
-    const { data: requerimientos, error: errorRequerimientos } = await db
+    const {
+      data: requerimientos,
+      error: errorRequerimientos,
+    } = await db
       .from('requerimiento_habilidad')
-      .select('id, id_area, nivel_requerimiento, id_requerimiento')
+      .select(
+        'id, id_area, nivel_requerimiento, id_requerimiento',
+      )
       .in('id_requerimiento', idsRequerimientos);
 
     if (errorRequerimientos) {
-      throw new InternalServerErrorException(errorRequerimientos.message);
+      throw new InternalServerErrorException(
+        errorRequerimientos.message,
+      );
     }
 
     const idsAreas = [
       ...new Set([
-        ...(habilidades ?? []).map((h) => h.id_area),
-        ...(requerimientos ?? []).map((r) => r.id_area),
+        ...(habilidades ?? []).map(
+          (habilidad) => habilidad.id_area,
+        ),
+        ...(requerimientos ?? []).map(
+          (requerimiento) => requerimiento.id_area,
+        ),
       ]),
     ];
 
     const nombresAreas = new Map<string, string>();
 
     if (idsAreas.length > 0) {
-      const { data: areas, error: errorAreas } = await db
+      const {
+        data: areas,
+        error: errorAreas,
+      } = await db
         .from('area')
         .select('id, nombre')
         .in('id', idsAreas);
 
       if (errorAreas) {
-        throw new InternalServerErrorException(errorAreas.message);
+        throw new InternalServerErrorException(
+          errorAreas.message,
+        );
       }
 
       for (const area of areas ?? []) {
@@ -100,38 +155,54 @@ export class AfinidadService {
       }
     }
 
-    const requisitos = (requerimientos ?? []).map((requisito) => {
-      const habilidad = (habilidades ?? []).find(
-        (item) => item.id_area === requisito.id_area,
-      );
+    const requisitos = (requerimientos ?? []).map(
+      (requisito) => {
+        const habilidad = (habilidades ?? []).find(
+          (item) => item.id_area === requisito.id_area,
+        );
 
-      const nivelRequerido = requisito.nivel_requerimiento;
-      const nivelCandidato = habilidad?.nivel;
+        const nivelRequerido =
+          requisito.nivel_requerimiento;
 
-      const cumpleNivel =
-        !nivelRequerido ||
-        (habilidad !== undefined &&
-          (NIVEL_VALOR[nivelCandidato ?? ''] ?? 0) >=
-            (NIVEL_VALOR[nivelRequerido] ?? 0));
+        const nivelCandidato = habilidad?.nivel;
 
-      const cumple = Boolean(habilidad && cumpleNivel);
+        const cumpleNivel =
+          !nivelRequerido ||
+          (
+            habilidad !== undefined &&
+            normalizarNivel(nivelCandidato) >=
+              normalizarNivel(nivelRequerido)
+          );
 
-      return {
-        id: requisito.id,
-        area: nombresAreas.get(requisito.id_area) ?? 'Área sin nombre',
-        nivelRequerido,
-        nivelCandidato: nivelCandidato ?? null,
-        cumplido: cumple,
-      };
-    });
+        const cumple = Boolean(
+          habilidad && cumpleNivel,
+        );
 
-    const cumplidos = requisitos.filter((r) => r.cumplido).length;
+        return {
+          id: requisito.id,
+          area:
+            nombresAreas.get(requisito.id_area) ??
+            'Área sin nombre',
+          nivelRequerido,
+          nivelCandidato: nivelCandidato ?? null,
+          cumplido: cumple,
+        };
+      },
+    );
+
+    const cumplidos = requisitos.filter(
+      (requisito) => requisito.cumplido,
+    ).length;
+
     const total = requisitos.length;
 
     return {
       idVacante,
       idEgresado,
-      porcentaje: total > 0 ? Math.round((cumplidos / total) * 100) : null,
+      porcentaje:
+        total > 0
+          ? Math.round((cumplidos / total) * 100)
+          : null,
       cumplidos,
       total,
       requisitos,
