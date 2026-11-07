@@ -16,6 +16,7 @@ import { HabilidadesEgresadoModule } from './modules/habilidades-egresado/habili
     FormacionAcademicaModule,
     ExperienciaLaboralModule,
     VacantesModule,
+    HabilidadesEgresadoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
