@@ -135,6 +135,14 @@ export class VacantesController {
     return this.afinidadService.calcular(req.user, id);
   }
 
+  // Simulación temporal con un egresado de prueba
+  @Get(':id/afinidad/simulacion')
+  consultarAfinidadSimulada(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.afinidadService.calcularSimulacion(id);
+  }
+
   @Get(':id')
   obtenerPorId(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.vacantesService.obtenerPorId(id);
