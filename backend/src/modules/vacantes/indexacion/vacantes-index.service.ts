@@ -20,8 +20,17 @@ export class VacantesIndexService {
     return { indexed: true, id: vacancy.id, index };
   }
 
-  buscar(query: string) {
-    return this.elasticsearchService.searchVacancies(query);
+  async buscar(query: string) {
+    try {
+      return await this.elasticsearchService.searchVacancies(query);
+    } catch (error) {
+      console.warn(
+        'Elasticsearch no está disponible. Se utilizará Supabase para buscar vacantes.',
+        error instanceof Error ? error.message : error,
+      );
+
+      return this.vacantesService.buscarVacantes(query);
+    }
   }
 
   mapToIndexDocument(vacancy: VacancySource): VacancyIndexDocument {
