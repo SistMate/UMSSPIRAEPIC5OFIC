@@ -6,25 +6,39 @@ import {
 import { SupabaseService } from '../../config/supabase.service';
 import { AuthenticatedUser } from '../experiencia-laboral/authenticated-user';
 
-type Nivel = 'Básico' | 'Intermedio' | 'Avanzado';
+const EGRESADO_PRUEBA_ID = 'ee9bf378-5daf-4724-ac0f-7a52d6bd005e';
 
 const NIVEL_VALOR: Record<string, number> = {
-  'Básico': 1,
-  'Intermedio': 2,
-  'Avanzado': 3,
+  Básico: 1,
+  Intermedio: 2,
+  Avanzado: 3,
 };
 
 @Injectable()
 export class AfinidadService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  // Cálculo para usuarios autenticados
   async calcular(usuario: AuthenticatedUser, idVacante: string) {
+    return this.calcularPorEgresado(usuario.egresadoId, idVacante);
+  }
+
+  // Cálculo temporal para el egresado de prueba
+  async calcularSimulacion(idVacante: string) {
+    return this.calcularPorEgresado(EGRESADO_PRUEBA_ID, idVacante);
+  }
+
+  // Lógica compartida de cálculo de afinidad
+  private async calcularPorEgresado(
+    idEgresado: string,
+    idVacante: string,
+  ) {
     const db = this.supabaseService.getAdminClient();
 
     const { data: habilidades, error: errorHabilidades } = await db
       .from('habilidad_egresado')
       .select('id_area, nivel, anios_experiencia')
-      .eq('id_egresado', usuario.egresadoId);
+      .eq('id_egresado', idEgresado);
 
     if (errorHabilidades) {
       throw new InternalServerErrorException(errorHabilidades.message);
@@ -69,18 +83,22 @@ export class AfinidadService {
       ]),
     ];
 
-    const { data: areas, error: errorAreas } = await db
-      .from('area')
-      .select('id, nombre')
-      .in('id', idsAreas);
+    const nombresAreas = new Map<string, string>();
 
-    if (errorAreas) {
-      throw new InternalServerErrorException(errorAreas.message);
+    if (idsAreas.length > 0) {
+      const { data: areas, error: errorAreas } = await db
+        .from('area')
+        .select('id, nombre')
+        .in('id', idsAreas);
+
+      if (errorAreas) {
+        throw new InternalServerErrorException(errorAreas.message);
+      }
+
+      for (const area of areas ?? []) {
+        nombresAreas.set(area.id, area.nombre);
+      }
     }
-
-    const nombresAreas = new Map(
-      (areas ?? []).map((area) => [area.id, area.nombre]),
-    );
 
     const requisitos = (requerimientos ?? []).map((requisito) => {
       const habilidad = (habilidades ?? []).find(
@@ -112,7 +130,8 @@ export class AfinidadService {
 
     return {
       idVacante,
-      porcentaje: Math.round((cumplidos / total) * 100),
+      idEgresado,
+      porcentaje: total > 0 ? Math.round((cumplidos / total) * 100) : null,
       cumplidos,
       total,
       requisitos,
