@@ -27,7 +27,7 @@ import { VacantesEstructuraService } from './vacantes-estructura.service';
 import { VacantesService } from './vacantes.service';
 import { AfinidadService } from './afinidad.service';
 
-import { AuthenticatedRequest } from '../experiencia-laboral/authenticated-user';
+import type { AuthenticatedRequest } from '../experiencia-laboral/authenticated-user';
 import { SupabaseAuthGuard } from '../experiencia-laboral/supabase-auth.guard';
 
 @Controller('vacantes')
