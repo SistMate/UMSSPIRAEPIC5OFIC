@@ -1,3 +1,4 @@
+
 import {
   Body,
   Controller,
@@ -10,16 +11,24 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+
 import { ActualizarRequisitoDto } from './dto/actualizar-requisito.dto';
 import { AddRequisitosDto } from './dto/add-requisitos.dto';
 import { AsociarRequisitosDto } from './dto/asociar-requisitos.dto';
 import { CreateVacanteDto } from './dto/create-vacante.dto';
 import { ValidarEstructuraVacanteDto } from './dto/validar-estructura-vacante.dto';
+
 import { VacantesIndexService } from './indexacion/vacantes-index.service';
 import { RequisitosTecnicosService } from './requisitos-tecnicos.service';
 import { VacantesEstructuraService } from './vacantes-estructura.service';
 import { VacantesService } from './vacantes.service';
+import { AfinidadService } from './afinidad.service';
+
+import { AuthenticatedRequest } from '../experiencia-laboral/authenticated-user';
+import { SupabaseAuthGuard } from '../experiencia-laboral/supabase-auth.guard';
 
 @Controller('vacantes')
 export class VacantesController {
@@ -28,6 +37,7 @@ export class VacantesController {
     private readonly requisitosTecnicosService: RequisitosTecnicosService,
     private readonly vacantesService: VacantesService,
     private readonly vacantesIndexService: VacantesIndexService,
+    private readonly afinidadService: AfinidadService,
   ) {}
 
   @Post('estructura/validar')
@@ -113,6 +123,16 @@ export class VacantesController {
     @Query('idEmpresa', new ParseUUIDPipe()) idEmpresa: string,
   ) {
     return this.vacantesService.listarPorEmpresa(idEmpresa);
+  }
+
+  // Afinidad del egresado autenticado con una vacante
+  @Get(':id/afinidad')
+  @UseGuards(SupabaseAuthGuard)
+  consultarAfinidad(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.afinidadService.calcular(req.user, id);
   }
 
   @Get(':id')
