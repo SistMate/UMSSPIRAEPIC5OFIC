@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   Injectable,
@@ -19,10 +18,10 @@ export class HabilidadesEgresadoService {
         id_area,
         nivel,
         anios_experiencia,
-        area:area_id (
+        area:area!fk_habilidad_area (
           id,
           nombre
-        )
+          )
       `)
       .eq('id_egresado', usuario.egresadoId);
 
