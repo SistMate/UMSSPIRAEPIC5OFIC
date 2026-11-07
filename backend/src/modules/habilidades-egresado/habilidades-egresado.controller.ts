@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 
 import { HabilidadesEgresadoService } from './habilidades-egresado.service';
-import {
+import type {
   AuthenticatedRequest,
   AuthenticatedUser,
 } from '../experiencia-laboral/authenticated-user';
